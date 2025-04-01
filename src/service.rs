@@ -19,6 +19,13 @@ pub struct ProxyLayer {
     pub backend: Backend,
 }
 
+impl ProxyLayer {
+    /// Creates a new [`ProxyLayer`] with the given backend.
+    pub fn new(backend: Backend) -> Self {
+        Self { backend }
+    }
+}
+
 impl<S> Layer<S> for ProxyLayer {
     type Service = ProxyService<S>;
     fn layer(&self, inner: S) -> Self::Service {
@@ -39,8 +46,8 @@ impl<S> Service<HttpRequest<HttpBody>> for ProxyService<S>
 where
     S: Service<HttpRequest<HttpBody>, Response = HttpResponse> + Send + Sync + Clone + 'static,
     <S as Service<HttpRequest<HttpBody>>>::Response: 'static,
-    <S as Service<HttpRequest<HttpBody>>>::Future: Into<BoxError> + Send + Sync + 'static,
-    <S as Service<HttpRequest<HttpBody>>>::Error: Into<BoxError> + Send + Sync,
+    <S as Service<HttpRequest<HttpBody>>>::Future: Send + 'static,
+    <S as Service<HttpRequest<HttpBody>>>::Error: Into<BoxError> + Send,
 {
     type Response = HttpResponse;
     type Error = BoxError;

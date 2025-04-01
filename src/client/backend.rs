@@ -15,7 +15,7 @@ pub struct Backend {
 }
 
 impl Backend {
-    /// Create a new `Backend` with the given clients.
+    /// Creates a new [`Backend`] with the given clients.
     pub fn new(client_0: HttpClient, client_1: HttpClient, client_2: HttpClient) -> Self {
         Self {
             client_0,

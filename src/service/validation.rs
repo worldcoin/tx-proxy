@@ -16,6 +16,13 @@ pub struct ValidationLayer {
     pub backend: Backend,
 }
 
+impl ValidationLayer {
+    /// Creates a new [`ValidationLayer`] with the given backend.
+    pub fn new(backend: Backend) -> Self {
+        Self { backend }
+    }
+}
+
 impl<S> Layer<S> for ValidationLayer {
     type Service = ValidationService<S>;
     fn layer(&self, inner: S) -> Self::Service {
@@ -36,8 +43,8 @@ impl<S> Service<HttpRequest<HttpBody>> for ValidationService<S>
 where
     S: Service<HttpRequest<HttpBody>, Response = HttpResponse> + Send + Sync + Clone + 'static,
     <S as Service<HttpRequest<HttpBody>>>::Response: 'static,
-    <S as Service<HttpRequest<HttpBody>>>::Future: Into<BoxError> + Send + Sync + 'static,
-    <S as Service<HttpRequest<HttpBody>>>::Error: Into<BoxError> + Send + Sync,
+    <S as Service<HttpRequest<HttpBody>>>::Future: Send + 'static,
+    <S as Service<HttpRequest<HttpBody>>>::Error: Into<BoxError> + Send,
 {
     type Response = HttpResponse;
     type Error = BoxError;
