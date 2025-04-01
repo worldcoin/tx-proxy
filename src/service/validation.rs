@@ -4,12 +4,12 @@ use std::{
 };
 
 use jsonrpsee::{
-    core::{BoxError, http_helpers},
+    core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
 };
 use tower::{Layer, Service};
 
-use crate::{client::backend::Backend, types::RpcRequest};
+use crate::{client::backend::Backend, utils::RpcRequest};
 
 /// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
 pub struct ValidationLayer {
@@ -56,31 +56,14 @@ where
     }
 
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
-        #[derive(serde::Deserialize, Debug)]
-        struct Request<'a> {
-            #[serde(borrow)]
-            method: &'a str,
-        }
-
         let mut service = self.clone();
-        let backend = self.backend.clone();
+        let mut backend = self.backend.clone();
         service.inner = std::mem::replace(&mut self.inner, service.inner);
 
         let fut = async move {
-            let (parts, body) = request.into_parts();
-            let (body_bytes, _) = http_helpers::read_body(&parts.headers, body, u32::MAX).await?;
-            let method = serde_json::from_slice::<Request>(&body_bytes)?
-                .method
-                .to_string();
-
-            let rpc_request = RpcRequest {
-                parts,
-                body: body_bytes,
-                method: method.clone(),
-            };
-
-            let result = backend.fan::<HttpBody>(rpc_request.clone()).await?;
-            let (res_0, _, _) = result;
+            let rpc_request = RpcRequest::from_request(request).await?;
+            let result = backend.fan(rpc_request.clone()).await?;
+            let (res_0, _, _) = result; // TODO: Think about how we want to handle the other responses
 
             if !res_0.is_validation_error() {
                 tokio::spawn(async move { service.inner.call(rpc_request.into()).await });

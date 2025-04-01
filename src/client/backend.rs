@@ -1,7 +1,7 @@
-use jsonrpsee::core::BoxError;
+use jsonrpsee::{core::BoxError, http_client::HttpBody};
 use tokio::join;
 
-use crate::types::{RpcRequest, RpcResponse};
+use crate::utils::{RpcRequest, RpcResponse};
 
 use super::http::HttpClient;
 
@@ -25,10 +25,17 @@ impl Backend {
     }
 
     /// Sends a JSON-RPC request to all clients and return the responses.
-    pub async fn fan<T>(
-        &self,
+    pub async fn fan(
+        &mut self,
         request: RpcRequest,
-    ) -> Result<(RpcResponse<T>, RpcResponse<T>, RpcResponse<T>), BoxError> {
+    ) -> Result<
+        (
+            RpcResponse<HttpBody>,
+            RpcResponse<HttpBody>,
+            RpcResponse<HttpBody>,
+        ),
+        BoxError,
+    > {
         let (res_0, res_1, res_2) = join!(
             self.client_0.forward(request.clone()),
             self.client_1.forward(request.clone()),

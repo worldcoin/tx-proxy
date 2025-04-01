@@ -3,7 +3,7 @@ use clap::Parser;
 mod cli;
 mod client;
 mod service;
-mod types;
+mod utils;
 
 #[tokio::main]
 async fn main() {

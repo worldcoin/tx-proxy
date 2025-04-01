@@ -7,6 +7,7 @@ use crate::service::{ProxyLayer, health::HealthLayer, validation::ValidationLaye
 mod rpc;
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;
+
 #[derive(clap::Parser)]
 #[clap(about, version, author)]
 pub struct Cli {
@@ -24,9 +25,11 @@ pub struct Cli {
     #[clap(long = "http.port", default_value_t = DEFAULT_HTTP_PORT)]
     pub http_port: u16,
 
-    /// Maximum number of connections to allow.
-    #[clap(long = "http.max_connections", default_value_t = 100)]
-    pub max_connections: u32,
+    /// Maximum number of concurrent connections to allow.
+    ///
+    /// Defaults to 500.
+    #[clap(long = "http.max-concurrent-connections", default_value_t = 500)]
+    pub max_concurrent_connections: u32,
 }
 
 impl Cli {
@@ -41,12 +44,11 @@ impl Cli {
 
         let server = Server::builder()
             .set_http_middleware(middleware)
-            .max_connections(self.max_connections)
+            .max_connections(self.max_concurrent_connections)
             .build(format!("{}:{}", self.http_addr, self.http_port))
             .await?;
 
-        let module: RpcModule<()> = RpcModule::new(());
-        let handle = server.start(module);
+        let handle = server.start(RpcModule::new(()));
 
         let stopped_handle = handle.clone();
         let shutdown_handle = handle.clone();
