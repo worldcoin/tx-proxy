@@ -65,7 +65,7 @@ where
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            let result = backend.fan(rpc_request.clone()).await?;
+            let result = backend.fan_request(rpc_request.clone()).await?;
             let (res_0, _, _) = result; // TODO: Think about this more
 
             Ok::<HttpResponse<HttpBody>, BoxError>(res_0.response)

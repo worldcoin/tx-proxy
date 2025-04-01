@@ -16,7 +16,7 @@ pub struct RpcRequest {
 }
 
 impl RpcRequest {
-    pub async fn from_request(request: http::Request<HttpBody>) -> eyre::Result<Self> {
+    pub async fn from_request(request: http::Request<HttpBody>) -> Result<Self> {
         let (parts, body) = request.into_parts();
         let (body_bytes, _) = http_helpers::read_body(&parts.headers, body, u32::MAX).await?;
 
@@ -50,9 +50,13 @@ impl<T> RpcResponse<T> {
         Self { response, status }
     }
 
+    // See: https://github.com/alloy-rs/alloy/blob/main/crates/rpc-types-eth/src/error.rs
     pub fn is_validation_error(&self) -> bool {
-        // TODO: Isolate validation error codes
-        self.status != 0
+        self.status == -32000
+            || self.status == -32003
+            || self.status == 3
+            || self.status == -32001
+            || self.status == -39001
     }
 }
 

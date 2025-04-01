@@ -25,7 +25,7 @@ impl Backend {
     }
 
     /// Sends a JSON-RPC request to all clients and return the responses.
-    pub async fn fan(
+    pub async fn fan_request(
         &mut self,
         request: RpcRequest,
     ) -> Result<
