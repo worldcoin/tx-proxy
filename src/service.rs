@@ -1,4 +1,3 @@
-pub mod health;
 pub mod validation;
 
 use std::{
@@ -79,7 +78,7 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
-    use super::{health::HealthLayer, validation::ValidationLayer, *};
+    use super::{validation::ValidationLayer, *};
     use crate::client::http::HttpClient as TxProxyHttpClient;
     use alloy_primitives::{Bytes, bytes, hex};
     use alloy_rpc_types_engine::JwtSecret;
@@ -94,6 +93,7 @@ mod tests {
         http_client::HttpClient,
         server::{Server, ServerHandle},
     };
+    use rollup_boost::HealthLayer;
     use serde_json::json;
     use tokio::{net::TcpListener, task::JoinHandle};
 

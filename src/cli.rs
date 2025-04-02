@@ -1,9 +1,10 @@
 use eyre::Result;
 use jsonrpsee::{RpcModule, server::Server};
+use rollup_boost::HealthLayer;
 use rpc::{BuilderBackend, L2Backend};
 use std::net::{IpAddr, Ipv4Addr};
 
-use crate::service::{ProxyLayer, health::HealthLayer, validation::ValidationLayer};
+use crate::service::{ProxyLayer, validation::ValidationLayer};
 mod rpc;
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;

@@ -8,14 +8,13 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
+use rollup_boost::{AuthClientLayer, AuthClientService};
 use tower::{Service, ServiceBuilder, ServiceExt};
 use tower_http::decompression::{Decompression, DecompressionLayer};
 use tracing::{debug, error};
 
-use super::auth::{AuthClientLayer, AuthService};
-
 pub type HttpClientService =
-    Decompression<AuthService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
+    Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
 
 #[derive(Clone, Debug)]
 pub(crate) struct HttpClient {
