@@ -1,0 +1,41 @@
+[package]
+name = "tx-proxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rollup-boost = { git = "https://github.com/flashbots/rollup-boost.git", rev = "eca9266" }
+alloy-rpc-types-engine = "0.12.5"
+clap = { version = "4.5.34", features = ["derive", "env"] }
+eyre = "0.6.12"
+http = "1.3.1"
+http-body-util = "0.1.3"
+hyper = { version = "1.6.0", features = ["full"] }
+hyper-rustls = "0.27.5"
+hyper-util = { version = "0.1.11", features = ["full"] }
+jsonrpsee = { version = "0.24", features = ["server", "http-client", "macros"] }
+paste = "1.0.15"
+rustls = { version = "0.23.25", features = ["ring"] }
+serde = "1.0.219"
+serde_json = "1.0.140"
+tokio = { version = "1.44.1", features = ["full"] }
+tower = "0.4.13"
+tower-http = { version = "0.6.2", features = ["decompression-full"] }
+tracing = "0.1.41"
+tracing-subscriber = {version = "0.3.19", features = ["env-filter", "json"] }
+metrics-exporter-prometheus = "0.16.2"
+metrics-util = "0.19.0"
+opentelemetry = { version = "0.28.0", features = ["trace"] }
+opentelemetry-otlp = { version = "0.28.0", features = [
+    "http-proto",
+    "http-json",
+    "reqwest-client",
+    "trace",
+    "grpc-tonic",
+] }
+opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
+tracing-opentelemetry =  "0.29.0"
+
+[dev-dependencies]
+ctor = "0.3.5"
+alloy-primitives = "0.8.25"
