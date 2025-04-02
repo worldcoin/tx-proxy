@@ -7,7 +7,6 @@ mod metrics;
 mod service;
 mod utils;
 
-// TODO: Tracing/Telemetry
 #[tokio::main]
 async fn main() {
     init_tls();
