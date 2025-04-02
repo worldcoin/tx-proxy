@@ -20,7 +20,6 @@ use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 
-use crate::tracing::MetricsSpanProcessor;
 use crate::{
     metrics::init_metrics_server,
     service::{ProxyLayer, validation::ValidationLayer},
@@ -163,10 +162,10 @@ impl Cli {
             global::set_text_map_propagator(TraceContextPropagator::new());
             let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
                 .with_tonic()
-                .with_endpoint(&self.otlp_endpoint.to_string())
+                .with_endpoint(self.otlp_endpoint.to_string())
                 .build()
                 .context("Failed to create OTLP exporter")?;
-            let mut provider_builder = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+            let provider_builder = opentelemetry_sdk::trace::SdkTracerProvider::builder()
                 .with_batch_exporter(otlp_exporter)
                 .with_resource(
                     Resource::builder_empty()
@@ -176,9 +175,7 @@ impl Cli {
                         ])
                         .build(),
                 );
-            if self.metrics {
-                provider_builder = provider_builder.with_span_processor(MetricsSpanProcessor);
-            }
+
             let provider = provider_builder.build();
             let tracer = provider.tracer(env!("CARGO_PKG_NAME"));
 

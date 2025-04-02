@@ -5,7 +5,6 @@ mod cli;
 mod client;
 mod metrics;
 mod service;
-mod tracing;
 mod utils;
 
 // TODO: Tracing/Telemetry

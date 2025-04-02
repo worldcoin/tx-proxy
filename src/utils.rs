@@ -32,11 +32,10 @@ impl RpcRequest {
     }
 }
 
-impl Into<http::Request<HttpBody>> for RpcRequest {
-    fn into(self) -> http::Request<HttpBody> {
-        let body = HttpBody::from(self.body);
-        let request = http::Request::from_parts(self.parts, body);
-        request
+impl From<RpcRequest> for http::Request<HttpBody> {
+    fn from(val: RpcRequest) -> http::Request<HttpBody> {
+        let body = HttpBody::from(val.body);
+        http::Request::from_parts(val.parts, body)
     }
 }
 

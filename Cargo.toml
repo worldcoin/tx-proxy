@@ -35,7 +35,6 @@ opentelemetry-otlp = { version = "0.28.0", features = [
 ] }
 opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
 tracing-opentelemetry =  "0.29.0"
-metrics = "0.24.1"
 
 [dev-dependencies]
 ctor = "0.3.5"
