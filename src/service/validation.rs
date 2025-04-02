@@ -8,6 +8,7 @@ use jsonrpsee::{
     http_client::{HttpBody, HttpRequest, HttpResponse},
 };
 use tower::{Layer, Service};
+use tracing::debug;
 
 use crate::{client::backend::Backend, utils::RpcRequest};
 
@@ -62,12 +63,15 @@ where
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
+            debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder backend");
+
             let result = backend.fan_request(rpc_request.clone()).await?;
             let (res_0, res_1, res_2) = result;
             if !(res_0.is_validation_error()
                 || res_1.is_validation_error()
                 || res_2.is_validation_error())
             {
+                debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 backend");
                 tokio::spawn(async move { service.inner.call(rpc_request.into()).await });
             }
 

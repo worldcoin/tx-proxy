@@ -27,7 +27,7 @@ impl Backend {
     /// Sends a JSON-RPC request to all clients and return the responses.
     pub async fn fan_request(
         &mut self,
-        request: RpcRequest,
+        req: RpcRequest,
     ) -> Result<
         (
             RpcResponse<HttpBody>,
@@ -37,9 +37,9 @@ impl Backend {
         BoxError,
     > {
         let (res_0, res_1, res_2) = join!(
-            self.client_0.forward(request.clone()),
-            self.client_1.forward(request.clone()),
-            self.client_2.forward(request)
+            self.client_0.forward(req.clone()),
+            self.client_1.forward(req.clone()),
+            self.client_2.forward(req)
         );
 
         Ok((res_0?, res_1?, res_2?))

@@ -2875,7 +2875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.100",
@@ -4250,13 +4250,18 @@ dependencies = [
  "clap",
  "ctor",
  "eyre",
- "futures",
  "http",
  "http-body-util",
  "hyper",
  "hyper-rustls",
  "hyper-util",
  "jsonrpsee",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "metrics-util",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
  "paste",
  "rollup-boost",
  "rustls",
@@ -4266,6 +4271,7 @@ dependencies = [
  "tower 0.4.13",
  "tower-http 0.6.2",
  "tracing",
+ "tracing-opentelemetry",
  "tracing-subscriber",
 ]
 

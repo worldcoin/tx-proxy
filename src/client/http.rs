@@ -8,10 +8,11 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
+use opentelemetry::trace::SpanKind;
 use rollup_boost::{AuthClientLayer, AuthClientService};
 use tower::{Service, ServiceBuilder, ServiceExt};
 use tower_http::decompression::{Decompression, DecompressionLayer};
-use tracing::{debug, error};
+use tracing::{debug, error, instrument};
 
 pub type HttpClientService =
     Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
@@ -42,6 +43,12 @@ impl HttpClient {
         Self { client, url }
     }
 
+    #[instrument(
+        skip(self, req),
+        target = "tx-proxy::http::forward",
+        fields(otel.kind = ?SpanKind::Client),
+        err(Debug)
+    )]
     pub async fn forward(&mut self, req: RpcRequest) -> Result<RpcResponse<HttpBody>, BoxError> {
         debug!("forwarding {}", req.method);
         let mut req: http::Request<HttpBody> = req.into();
