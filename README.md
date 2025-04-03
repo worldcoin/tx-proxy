@@ -1,6 +1,12 @@
 # tx-proxy: World Chain Transaction Relay Service
 
-`tx-proxy` is a proxy server that sits between Alchemy's transaction relays, our block builders, and the sequencing op-geth nodes on World Chain. The service multiplexes incoming `eth_sendRawTransaction` requests to two highly available backends.
+`tx-proxy` is a supplemental pass through proxy that re-routes RPC traffic to two high availability execution layer backends. 
+
+Priority Blockspace for Human's (PBH) on World Chain introduces an external block builder to the OP Stack which enforces a custom validation policy for PBH transactions. The role of `tx-proxy` is to validate transactions through the block builder prior to forwarding the transactions to the sequencing execution clients on the network. Ensuring synchronization of the mempool's across all sequencing execution clients on the network. 
+
+**Endpoints**
+- `eth_sendRawTransaction`
+- `eth_sendRawTransactionConditional`
 
 Its primary purpose is to ensure transactions are validated by builders before being relayed to Op-Geth sequencers. 
 
