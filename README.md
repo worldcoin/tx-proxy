@@ -8,9 +8,6 @@ Priority Blockspace for Humans (PBH) on World Chain introduces an external block
 - `eth_sendRawTransaction`
 - `eth_sendRawTransactionConditional`
 
-
-![](diagram.png)
-
 ## License
 
 Unless otherwise specified, all code in this repository is dual-licensed under
