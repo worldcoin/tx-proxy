@@ -1,5 +1,10 @@
-# tx-proxy
-World Chain Transaction Relay Service
+# tx-proxy: World Chain Transaction Relay Service
+
+`tx-proxy` is a proxy server that sits between Alchemy's transaction relays, our block builders, and the sequencing op-geth nodes on World Chain. The service multiplexes incoming `eth_sendRawTransaction` requests to two highly available backends.
+
+Its primary purpose is to ensure transactions are validated by builders before being relayed to Op-Geth sequencers. 
+
+![](diagram.png)
 
 ## License
 
