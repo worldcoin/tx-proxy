@@ -2,6 +2,9 @@
 name = "tx-proxy"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR (Apache-2.0 WITH LLVM-exception)"
+repository = "https://github.com/worldcoin/tx-proxy"
+publish = false
 
 [dependencies]
 rollup-boost = { git = "https://github.com/flashbots/rollup-boost.git", rev = "eca9266" }
