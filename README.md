@@ -1,8 +1,8 @@
 # tx-proxy: World Chain Transaction Relay Service
 
-`tx-proxy` is a supplemental pass through proxy that re-routes RPC traffic to two high availability execution layer backends. 
+`tx-proxy` is a supplemental pass-through proxy that re-routes RPC traffic to two high availability execution layer backends. 
 
-Priority Blockspace for Human's (PBH) on World Chain introduces an external block builder to the OP Stack which enforces a custom validation policy for PBH transactions. The role of `tx-proxy` is to validate transactions through the block builder prior to forwarding the transactions to the sequencing execution clients on the network. Ensuring synchronization of the mempool's across all sequencing execution clients on the network. 
+Priority Blockspace for Humans (PBH) on World Chain introduces an external block builder to the OP Stack which enforces a custom validation policy for PBH transactions. The role of `tx-proxy` is to validate transactions through the block builder prior to forwarding the transactions to the sequencing execution clients on the network, ensuring synchronization of the mempools across all sequencing execution clients on the network. 
 
 **Endpoints**
 - `eth_sendRawTransaction`
