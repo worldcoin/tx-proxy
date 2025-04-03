@@ -8,7 +8,6 @@ Priority Blockspace for Human's (PBH) on World Chain introduces an external bloc
 - `eth_sendRawTransaction`
 - `eth_sendRawTransactionConditional`
 
-Its primary purpose is to ensure transactions are validated by builders before being relayed to Op-Geth sequencers. 
 
 ![](diagram.png)
 
