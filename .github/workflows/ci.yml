@@ -21,14 +21,14 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5
+      - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af
         with:
           profile: minimal
           toolchain: stable
           override: true
       - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
+      - uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
         with:
           command: fmt
           args: --all -- --check
@@ -38,9 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af
         with:
           profile: minimal
           toolchain: ${{ env.NIGHTLY_VERSION }}
@@ -48,7 +48,7 @@ jobs:
       - name: Install protobuf-compiler
         run: sudo apt-get install -y protobuf-compiler
       - name: Cache
-        uses: actions/cache@v3
+        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f
         continue-on-error: false
         with:
           path: |
@@ -59,18 +59,18 @@ jobs:
           key: ${{ env.RUST_VERSION }}-${{ env.NIGHTLY_VERSION }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ env.RUST_VERSION }}-${{ env.NIGHTLY_VERSION }}-cargo-test-
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly
       - name: Install latest nextest release
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@76cb569e10d497bccc3ce282ed34846f69880246
       - name: Build tests
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
         with:
           command: nextest
           args: run --workspace --no-run
       - name: Run tests
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
         with:
           command: nextest
           args: run --workspace
