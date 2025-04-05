@@ -19,7 +19,6 @@ hyper-util = { version = "0.1.11", features = ["full"] }
 jsonrpsee = { version = "0.24", features = ["server", "http-client", "macros"] }
 paste = "1.0.15"
 rustls = { version = "0.23.25", features = ["ring"] }
-serde = "1.0.219"
 serde_json = "1.0.140"
 tokio = { version = "1.44.1", features = ["full"] }
 tower = "0.4.13"
