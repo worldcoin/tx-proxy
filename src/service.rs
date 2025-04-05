@@ -92,6 +92,7 @@ mod tests {
         core::client::ClientT,
         http_client::HttpClient,
         server::{Server, ServerHandle},
+        types::error::INTERNAL_ERROR_CODE,
     };
     use rollup_boost::HealthLayer;
     use serde_json::json;
@@ -291,34 +292,10 @@ mod tests {
                     "result": format!("{}", bytes!("1234")),
                     "id": request_body["id"]
                 }),
-                "eth_sendRawTransactionValidationFail0" => {
+                "eth_sendRawTransactionValidationFail" => {
                     let error_response = json!({
                         "jsonrpc": "2.0",
-                        "error": { "code": -32000, "message": "Error resp -32000" },
-                        "id": request_body["id"]
-                    });
-                    return Ok(hyper::Response::new(error_response.to_string()));
-                }
-                "eth_sendRawTransactionValidationFail1" => {
-                    let error_response = json!({
-                        "jsonrpc": "2.0",
-                        "error": { "code": -32003, "message": "Error resp -32003" },
-                        "id": request_body["id"]
-                    });
-                    return Ok(hyper::Response::new(error_response.to_string()));
-                }
-                "eth_sendRawTransactionValidationFail2" => {
-                    let error_response = json!({
-                        "jsonrpc": "2.0",
-                        "error": { "code": 3, "message": "Error resp -32001" },
-                        "id": request_body["id"]
-                    });
-                    return Ok(hyper::Response::new(error_response.to_string()));
-                }
-                "eth_sendRawTransactionValidationFail3" => {
-                    let error_response = json!({
-                        "jsonrpc": "2.0",
-                        "error": { "code": -39001, "message": "Error resp -39001" },
+                        "error": { "code": INTERNAL_ERROR_CODE, "message": "PBH Transaction Validation Failed" },
                         "id": request_body["id"]
                     });
                     return Ok(hyper::Response::new(error_response.to_string()));
@@ -454,14 +431,8 @@ mod tests {
             assert_eq!(l2_requests.len(), 0);
         };
 
-        send_request("eth_sendRawTransactionValidationFail0").await;
+        send_request("eth_sendRawTransactionValidationFail").await;
         assert_validation_fail_case(&test_harness, 1).await;
-        send_request("eth_sendRawTransactionValidationFail1").await;
-        assert_validation_fail_case(&test_harness, 2).await;
-        send_request("eth_sendRawTransactionValidationFail2").await;
-        assert_validation_fail_case(&test_harness, 3).await;
-        send_request("eth_sendRawTransactionValidationFail3").await;
-        assert_validation_fail_case(&test_harness, 4).await;
 
         Ok(())
     }

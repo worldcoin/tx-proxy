@@ -4264,7 +4264,6 @@ dependencies = [
  "paste",
  "rollup-boost",
  "rustls",
- "serde",
  "serde_json",
  "tokio",
  "tower 0.4.13",
