@@ -1,4 +1,4 @@
-use crate::utils::{RpcRequest, RpcResponse, parse_response_code};
+use crate::utils::{RpcRequest, RpcResponse, parse_response_payload};
 use alloy_rpc_types_engine::JwtSecret;
 use http::Uri;
 use http_body_util::BodyExt;
@@ -12,7 +12,7 @@ use opentelemetry::trace::SpanKind;
 use rollup_boost::{AuthClientLayer, AuthClientService};
 use tower::{Service, ServiceBuilder, ServiceExt};
 use tower_http::decompression::{Decompression, DecompressionLayer};
-use tracing::{debug, error, instrument};
+use tracing::{debug, instrument};
 
 pub type HttpClientService =
     Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
@@ -58,15 +58,8 @@ impl HttpClient {
 
         let (parts, body) = res.into_parts();
         let body_bytes = body.collect().await?.to_bytes().to_vec();
-
-        let code = if let Some(code) = parse_response_code(&body_bytes)? {
-            error!(%code, "error in forwarded response");
-            code
-        } else {
-            0
-        };
-
+        let payload = parse_response_payload(&body_bytes)?;
         let response = http::Response::from_parts(parts, HttpBody::from(body_bytes));
-        Ok(RpcResponse::new(response, code))
+        Ok(RpcResponse::new(response, payload))
     }
 }
