@@ -5,17 +5,17 @@ use crate::utils::{RpcRequest, RpcResponse};
 
 use super::http::HttpClient;
 
-/// A Backend for fanning JSON-RPC requests to multiple
+/// A FanoutWrite for fanning JSON-RPC requests to multiple
 /// Clients in a High Availability configuration.
 #[derive(Clone, Debug)]
-pub struct Backend {
+pub struct FanoutWrite {
     pub(crate) client_0: HttpClient,
     pub(crate) client_1: HttpClient,
     pub(crate) client_2: HttpClient,
 }
 
-impl Backend {
-    /// Creates a new [`Backend`] with the given clients.
+impl FanoutWrite {
+    /// Creates a new [`FanoutWrite`] with the given clients.
     pub fn new(client_0: HttpClient, client_1: HttpClient, client_2: HttpClient) -> Self {
         Self {
             client_0,

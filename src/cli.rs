@@ -9,7 +9,7 @@ use opentelemetry::{KeyValue, global};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use rollup_boost::{HealthLayer, LogFormat};
-use rpc::{BuilderBackend, L2Backend};
+use rpc::{BuilderTargets, L2Targets};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tracing::Level;
 use tracing::error;
@@ -34,10 +34,10 @@ pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
 #[clap(about, version, author)]
 pub struct Cli {
     #[clap(flatten)]
-    pub l2_backend: L2Backend,
+    pub l2_targets: L2Targets,
 
     #[clap(flatten)]
-    pub builder_backend: BuilderBackend,
+    pub builder_targets: BuilderTargets,
 
     /// The address to bind the HTTP server to.
     #[clap(long, env, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
@@ -87,13 +87,13 @@ impl Cli {
         self.init_tracing()?;
         self.init_metrics()?;
 
-        let l2_backend = self.l2_backend.build_backend()?;
-        let builder_backend = self.builder_backend.build_backend()?;
+        let l2_targets = self.l2_targets.build_backend()?;
+        let builder_targets = self.builder_targets.build_backend()?;
 
         let middleware = tower::ServiceBuilder::new()
             .layer(HealthLayer)
-            .layer(ValidationLayer::new(builder_backend))
-            .layer(ProxyLayer::new(l2_backend));
+            .layer(ValidationLayer::new(builder_targets))
+            .layer(ProxyLayer::new(l2_targets));
 
         let server = Server::builder()
             .set_http_middleware(middleware)

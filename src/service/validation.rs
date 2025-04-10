@@ -10,16 +10,16 @@ use jsonrpsee::{
 use tower::{Layer, Service};
 use tracing::debug;
 
-use crate::{client::backend::Backend, utils::RpcRequest};
+use crate::{client::backend::FanoutWrite, utils::RpcRequest};
 
 /// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
 pub struct ValidationLayer {
-    pub backend: Backend,
+    pub backend: FanoutWrite,
 }
 
 impl ValidationLayer {
     /// Creates a new [`ValidationLayer`] with the given backend.
-    pub fn new(backend: Backend) -> Self {
+    pub fn new(backend: FanoutWrite) -> Self {
         Self { backend }
     }
 }
@@ -36,7 +36,7 @@ impl<S> Layer<S> for ValidationLayer {
 
 #[derive(Clone)]
 pub struct ValidationService<S> {
-    backend: Backend,
+    backend: FanoutWrite,
     inner: S,
 }
 

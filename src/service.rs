@@ -11,16 +11,16 @@ use jsonrpsee::{
 };
 use tower::{Layer, Service};
 
-use crate::{client::backend::Backend, utils::RpcRequest};
+use crate::{client::backend::FanoutWrite, utils::RpcRequest};
 
 /// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
 pub struct ProxyLayer {
-    pub backend: Backend,
+    pub backend: FanoutWrite,
 }
 
 impl ProxyLayer {
     /// Creates a new [`ProxyLayer`] with the given backend.
-    pub fn new(backend: Backend) -> Self {
+    pub fn new(backend: FanoutWrite) -> Self {
         Self { backend }
     }
 }
@@ -37,7 +37,7 @@ impl<S> Layer<S> for ProxyLayer {
 
 #[derive(Clone)]
 pub struct ProxyService<S> {
-    backend: Backend,
+    backend: FanoutWrite,
     inner: S,
 }
 
@@ -156,13 +156,13 @@ mod tests {
                 JwtSecret::random(),
             );
 
-            let builder_backend = Backend {
+            let builder_backend = FanoutWrite {
                 client_0: builder_0_http_client,
                 client_1: builder_1_http_client,
                 client_2: builder_2_http_client,
             };
 
-            let l2_backend = Backend {
+            let l2_backend = FanoutWrite {
                 client_0: l2_0_http_client,
                 client_1: l2_1_http_client,
                 client_2: l2_2_http_client,
