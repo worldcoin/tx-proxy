@@ -1,2 +1,2 @@
-pub mod backend;
+pub mod fanout;
 pub mod http;

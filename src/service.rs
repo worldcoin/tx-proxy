@@ -11,7 +11,7 @@ use jsonrpsee::{
 };
 use tower::{Layer, Service};
 
-use crate::{client::backend::FanoutWrite, utils::RpcRequest};
+use crate::{client::fanout::FanoutWrite, utils::RpcRequest};
 
 /// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
 pub struct ProxyLayer {

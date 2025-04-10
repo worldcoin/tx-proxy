@@ -5,7 +5,7 @@ use hyper::Uri;
 use paste::paste;
 use std::path::PathBuf;
 
-use crate::client::{backend::FanoutWrite, http::HttpClient};
+use crate::client::{fanout::FanoutWrite, http::HttpClient};
 
 macro_rules! define_rpc_args {
     ($(($name:ident, $prefix:ident)),*) => {
