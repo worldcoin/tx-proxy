@@ -61,7 +61,7 @@ pub fn parse_response_payload(body_bytes: &[u8]) -> Result<Option<ErrorObjectOwn
     let payload = res.payload;
     match payload {
         ResponsePayload::Error(obj) => Ok(Some(obj.into_owned())),
-        _ => return Ok(None),
+        _ => Ok(None),
     }
 }
 
