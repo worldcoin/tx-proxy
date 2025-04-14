@@ -10,17 +10,17 @@ use jsonrpsee::{
 use tower::{Layer, Service};
 use tracing::debug;
 
-use crate::{client::backend::FanoutWrite, utils::RpcRequest};
+use crate::{client::fanout::FanoutWrite, utils::RpcRequest};
 
-/// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
+/// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ValidationLayer {
-    pub backend: FanoutWrite,
+    pub fanout: FanoutWrite,
 }
 
 impl ValidationLayer {
-    /// Creates a new [`ValidationLayer`] with the given backend.
-    pub fn new(backend: FanoutWrite) -> Self {
-        Self { backend }
+    /// Creates a new [`ValidationLayer`] with the given fanout.
+    pub fn new(fanout: FanoutWrite) -> Self {
+        Self { fanout }
     }
 }
 
@@ -28,7 +28,7 @@ impl<S> Layer<S> for ValidationLayer {
     type Service = ValidationService<S>;
     fn layer(&self, inner: S) -> Self::Service {
         ValidationService {
-            backend: self.backend.clone(),
+            fanout: self.fanout.clone(),
             inner,
         }
     }
@@ -36,7 +36,7 @@ impl<S> Layer<S> for ValidationLayer {
 
 #[derive(Clone)]
 pub struct ValidationService<S> {
-    backend: FanoutWrite,
+    fanout: FanoutWrite,
     inner: S,
 }
 
@@ -58,17 +58,16 @@ where
 
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
-        let mut backend = self.backend.clone();
+        let mut fanout = self.fanout.clone();
         service.inner = std::mem::replace(&mut self.inner, service.inner);
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder backend");
+            debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
 
-            let result = backend.fan_request(rpc_request.clone()).await?;
-            let (res_0, res_1, res_2) = result;
+            let (res_0, res_1, res_2) = fanout.fan_request(rpc_request.clone()).await?;
             if !(res_0.pbh_error() || res_1.pbh_error() || res_2.pbh_error()) {
-                debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 backend");
+                debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");
                 tokio::spawn(async move { service.inner.call(rpc_request.into()).await });
             }
 
