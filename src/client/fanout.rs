@@ -1,6 +1,5 @@
 use futures::future::try_join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-use tokio::{join, try_join};
 
 use crate::utils::{RpcRequest, RpcResponse};
 
