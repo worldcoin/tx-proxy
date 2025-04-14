@@ -56,7 +56,7 @@ macro_rules! define_rpc_args {
                         let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt.clone());
                         let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt.clone());
                         let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt);
-                        Ok(FanoutWrite::new(client_0, client_1, client_2))
+                        Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
                     }
                 }
             }

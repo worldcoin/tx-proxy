@@ -63,8 +63,9 @@ where
         service.inner = std::mem::replace(&mut self.inner, service.inner);
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            let result = fanout.fan_request(rpc_request.clone()).await?;
-            Ok::<HttpResponse<HttpBody>, BoxError>(result.0.response)
+            let mut result = fanout.fan_request(rpc_request.clone()).await?;
+
+            Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
         };
 
         Box::pin(fut)
@@ -156,17 +157,15 @@ mod tests {
                 JwtSecret::random(),
             );
 
-            let builder_fanout = FanoutWrite {
-                client_0: builder_0_http_client,
-                client_1: builder_1_http_client,
-                client_2: builder_2_http_client,
-            };
+            let builder_fanout = FanoutWrite::new(vec![
+                builder_0_http_client,
+                builder_1_http_client,
+                builder_2_http_client,
+            ]);
 
-            let l2_fanout = FanoutWrite {
-                client_0: l2_0_http_client,
-                client_1: l2_1_http_client,
-                client_2: l2_2_http_client,
-            };
+            let l2_fanout =
+                FanoutWrite::new(vec![l2_0_http_client, l2_1_http_client, l2_2_http_client]);
+
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
                 .layer(ValidationLayer::new(builder_fanout))

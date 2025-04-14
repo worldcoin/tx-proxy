@@ -65,13 +65,16 @@ where
             let rpc_request = RpcRequest::from_request(request).await?;
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
 
-            let (res_0, res_1, res_2) = fanout.fan_request(rpc_request.clone()).await?;
-            if !(res_0.pbh_error() || res_1.pbh_error() || res_2.pbh_error()) {
+            let mut responses = fanout.fan_request(rpc_request.clone()).await?;
+
+            if responses.iter().all(|res| !res.pbh_error()) {
                 debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");
-                tokio::spawn(async move { service.inner.call(rpc_request.into()).await });
+                tokio::spawn(async move {
+                    let _ = service.inner.call(rpc_request.into()).await;
+                });
             }
 
-            Ok::<HttpResponse<HttpBody>, BoxError>(res_0.response)
+            Ok::<HttpResponse<HttpBody>, BoxError>(responses.remove(0).response)
         };
 
         Box::pin(fut)

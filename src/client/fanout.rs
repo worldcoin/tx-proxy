@@ -1,5 +1,6 @@
+use futures::future::try_join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-use tokio::join;
+use tokio::{join, try_join};
 
 use crate::utils::{RpcRequest, RpcResponse};
 
@@ -23,12 +24,13 @@ impl FanoutWrite {
         &mut self,
         req: RpcRequest,
     ) -> Result<Vec<RpcResponse<HttpBody>>, BoxError> {
-        let (res_0, res_1, res_2) = join!(
-            self.client_0.forward(req.clone()),
-            self.client_1.forward(req.clone()),
-            self.client_2.forward(req)
-        );
+        let fut = self
+            .targets
+            .iter_mut()
+            .map(|client| client.forward(req.clone()))
+            .collect::<Vec<_>>();
 
-        Ok((res_0?, res_1?, res_2?))
+        let responses = try_join_all(fut).await?;
+        Ok(responses)
     }
 }
