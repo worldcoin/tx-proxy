@@ -51,7 +51,7 @@ macro_rules! define_rpc_args {
                         }
                     }
 
-                    pub fn build_backend(&self) -> Result<FanoutWrite> {
+                    pub fn build_fanout(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
                         let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt.clone());
                         let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt.clone());

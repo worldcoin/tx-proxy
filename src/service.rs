@@ -13,15 +13,15 @@ use tower::{Layer, Service};
 
 use crate::{client::fanout::FanoutWrite, utils::RpcRequest};
 
-/// A [`Layer`] that validates responses from one backend prior to forwarding them to the next backend.
+/// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
-    pub backend: FanoutWrite,
+    pub fanout: FanoutWrite,
 }
 
 impl ProxyLayer {
-    /// Creates a new [`ProxyLayer`] with the given backend.
-    pub fn new(backend: FanoutWrite) -> Self {
-        Self { backend }
+    /// Creates a new [`ProxyLayer`] with the given fanout.
+    pub fn new(fanout: FanoutWrite) -> Self {
+        Self { fanout }
     }
 }
 
@@ -29,7 +29,7 @@ impl<S> Layer<S> for ProxyLayer {
     type Service = ProxyService<S>;
     fn layer(&self, inner: S) -> Self::Service {
         ProxyService {
-            backend: self.backend.clone(),
+            fanout: self.fanout.clone(),
             inner,
         }
     }
@@ -37,7 +37,7 @@ impl<S> Layer<S> for ProxyLayer {
 
 #[derive(Clone)]
 pub struct ProxyService<S> {
-    backend: FanoutWrite,
+    fanout: FanoutWrite,
     inner: S,
 }
 
@@ -59,11 +59,11 @@ where
 
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
-        let mut backend = self.backend.clone();
+        let mut fanout = self.fanout.clone();
         service.inner = std::mem::replace(&mut self.inner, service.inner);
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            let result = backend.fan_request(rpc_request.clone()).await?;
+            let result = fanout.fan_request(rpc_request.clone()).await?;
             Ok::<HttpResponse<HttpBody>, BoxError>(result.0.response)
         };
 
@@ -156,21 +156,21 @@ mod tests {
                 JwtSecret::random(),
             );
 
-            let builder_backend = FanoutWrite {
+            let builder_fanout = FanoutWrite {
                 client_0: builder_0_http_client,
                 client_1: builder_1_http_client,
                 client_2: builder_2_http_client,
             };
 
-            let l2_backend = FanoutWrite {
+            let l2_fanout = FanoutWrite {
                 client_0: l2_0_http_client,
                 client_1: l2_1_http_client,
                 client_2: l2_2_http_client,
             };
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(builder_backend))
-                .layer(ProxyLayer::new(l2_backend));
+                .layer(ValidationLayer::new(builder_fanout))
+                .layer(ProxyLayer::new(l2_fanout));
             let temp_listener = TcpListener::bind("0.0.0.0:0").await?;
             let server_addr = temp_listener.local_addr()?;
 
@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(builder_req["method"], expected_method);
         assert_eq!(builder_req["params"][0], expected_tx);
 
-        // Because the request to the l2 backend is non blocking on the future returned from the validation service
+        // Because the request to the l2 fanout is non blocking on the future returned from the validation service
         // We need to sleep the thread here
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
@@ -413,7 +413,7 @@ mod tests {
             let builder_requests = builder_2.requests.lock().unwrap();
             assert_eq!(builder_requests.len(), expected_length);
 
-            // Because the request to the l2 backend is non blocking on the future returned from the validation service
+            // Because the request to the l2 fanout is non blocking on the future returned from the validation service
             // We need to sleep the thread here
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 

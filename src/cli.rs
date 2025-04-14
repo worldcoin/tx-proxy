@@ -87,8 +87,8 @@ impl Cli {
         self.init_tracing()?;
         self.init_metrics()?;
 
-        let l2_targets = self.l2_targets.build_backend()?;
-        let builder_targets = self.builder_targets.build_backend()?;
+        let l2_targets = self.l2_targets.build_fanout()?;
+        let builder_targets = self.builder_targets.build_fanout()?;
 
         let middleware = tower::ServiceBuilder::new()
             .layer(HealthLayer)
