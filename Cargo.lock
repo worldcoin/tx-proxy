@@ -4250,6 +4250,7 @@ dependencies = [
  "clap",
  "ctor",
  "eyre",
+ "futures",
  "http",
  "http-body-util",
  "hyper",

@@ -5,7 +5,7 @@ use hyper::Uri;
 use paste::paste;
 use std::path::PathBuf;
 
-use crate::client::{backend::Backend, http::HttpClient};
+use crate::client::{fanout::FanoutWrite, http::HttpClient};
 
 macro_rules! define_rpc_args {
     ($(($name:ident, $prefix:ident)),*) => {
@@ -51,12 +51,12 @@ macro_rules! define_rpc_args {
                         }
                     }
 
-                    pub fn build_backend(&self) -> Result<Backend> {
+                    pub fn build(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
                         let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt.clone());
                         let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt.clone());
                         let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt);
-                        Ok(Backend::new(client_0, client_1, client_2))
+                        Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
                     }
                 }
             }
@@ -64,4 +64,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!((BuilderBackend, builder), (L2Backend, l2));
+define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
