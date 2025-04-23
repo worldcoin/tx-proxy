@@ -54,6 +54,10 @@ impl<T> RpcResponse<T> {
         }
         false
     }
+
+    pub fn is_error(&self) -> bool {
+        self.error.is_some()
+    }
 }
 
 pub fn parse_response_payload(body_bytes: &[u8]) -> Result<Option<ErrorObjectOwned>> {
