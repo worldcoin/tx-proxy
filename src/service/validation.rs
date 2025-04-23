@@ -74,10 +74,21 @@ where
             }
 
             let res_0 = responses.remove(0).response;
-            let response = responses
-                .into_iter()
-                .find(|res| !res.is_error())
-                .map(|res| res.response);
+
+            // Loop through each response, if pbh error, break
+            // otherwise if the response is valid, set the response
+            let mut response = None;
+            for res in responses {
+                // If the response is a pbh error, short circuit
+                if res.pbh_error() {
+                    response = Some(res.response);
+                    break;
+                }
+                // If the response has not been set and res is not err, set the response
+                if response.is_none() && !res.is_error() {
+                    response = Some(res.response);
+                }
+            }
 
             Ok::<HttpResponse<HttpBody>, BoxError>(response.unwrap_or(res_0))
         };
