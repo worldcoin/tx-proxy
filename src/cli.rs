@@ -1,30 +1,35 @@
+use crate::{
+    client::HttpClient, fanout::FanoutWrite, proxy::ProxyLayer, validation::ValidationLayer,
+};
+use alloy_rpc_types_engine::JwtSecret;
+use clap::Parser;
 use eyre::Context as _;
-use eyre::Result;
-use http::Uri;
+use eyre::{Result, eyre};
+use http::{Request, Response, StatusCode};
+use hyper::Uri;
+use hyper::{server::conn::http1, service::service_fn};
+use hyper_util::rt::TokioIo;
+use jsonrpsee::http_client::HttpBody;
 use jsonrpsee::{RpcModule, server::Server};
 use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_exporter_prometheus::PrometheusHandle;
 use metrics_util::layers::{PrefixLayer, Stack};
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::{KeyValue, global};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
+use paste::paste;
 use rollup_boost::{HealthLayer, LogFormat};
-use rpc::{BuilderTargets, L2Targets};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
+use tokio::net::TcpListener;
 use tracing::Level;
-use tracing::error;
-use tracing::info;
 use tracing::level_filters::LevelFilter;
+use tracing::{error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
-
-use crate::{
-    metrics::init_metrics_server,
-    service::{ProxyLayer, validation::ValidationLayer},
-};
-mod rpc;
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;
 pub const DEFAULT_METRICS_PORT: u16 = 9090;
@@ -84,6 +89,10 @@ pub struct Cli {
 
 impl Cli {
     pub async fn run(self) -> Result<()> {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("TLS Error: Failed to install default provider");
+
         self.init_tracing()?;
         self.init_metrics()?;
 
@@ -233,3 +242,102 @@ impl Cli {
         Ok(())
     }
 }
+
+pub(crate) async fn init_metrics_server(
+    addr: SocketAddr,
+    handle: PrometheusHandle,
+) -> eyre::Result<()> {
+    let listener = TcpListener::bind(addr).await?;
+    info!("Metrics server running on {}", addr);
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let handle = handle.clone(); // Clone the handle for each connection
+                tokio::task::spawn(async move {
+                    let service = service_fn(move |_req: Request<hyper::body::Incoming>| {
+                        let response = match _req.uri().path() {
+                            "/metrics" => Response::builder()
+                                .header("content-type", "text/plain")
+                                .body(HttpBody::from(handle.render()))
+                                .unwrap(),
+                            _ => Response::builder()
+                                .status(StatusCode::NOT_FOUND)
+                                .body(HttpBody::empty())
+                                .unwrap(),
+                        };
+                        async { Ok::<_, hyper::Error>(response) }
+                    });
+
+                    let io = TokioIo::new(stream);
+
+                    if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                        error!(message = "Error serving metrics connection", error = %err);
+                    }
+                });
+            }
+            Err(e) => {
+                error!(message = "Error accepting connection", error = %e);
+            }
+        }
+    }
+}
+
+macro_rules! define_rpc_args {
+    ($(($name:ident, $prefix:ident)),*) => {
+        $(
+            paste! {
+                #[derive(Parser, Debug, Clone, PartialEq, Eq)]
+                pub struct $name {
+                    /// RPC Server 0
+                    #[arg(long, env)]
+                    pub [<$prefix _url_0>]: Uri,
+
+                    /// RPC Server 1
+                    #[arg(long, env)]
+                    pub [<$prefix _url_1>]: Uri,
+
+                    /// RPC Server 2
+                    #[arg(long, env)]
+                    pub [<$prefix _url_2>]: Uri,
+
+                    /// Hex encoded JWT secret to use for an authenticated RPC server.
+                    #[arg(long, env, value_name = "HEX")]
+                    pub [<$prefix _jwt_token>]: Option<JwtSecret>,
+
+                    /// Path to a JWT secret to use for an authenticated RPC server.
+                    #[arg(long, env, value_name = "PATH")]
+                    pub [<$prefix _jwt_path>]: Option<PathBuf>,
+
+                    /// Timeout for http calls in milliseconds
+                    #[arg(long, env, default_value_t = 1000)]
+                    pub [<$prefix _timeout>]: u64,
+                }
+
+                impl $name {
+                    fn get_jwt(&self) -> Result<JwtSecret> {
+                        if let Some(secret) = &self.[<$prefix _jwt_token>] {
+                            Ok(secret.clone())
+                        } else if let Some(path) = &self.[<$prefix _jwt_path>] {
+                            Ok(JwtSecret::from_file(path)?)
+                        } else {
+                            Err(eyre!(
+                                "No JWT secret provided. Please provide either a hex encoded JWT secret or a path to a file containing the JWT secret."
+                            ))
+                        }
+                    }
+
+                    pub fn build(&self) -> Result<FanoutWrite> {
+                        let jwt = self.get_jwt()?;
+                        let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt.clone());
+                        let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt.clone());
+                        let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt);
+                        Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
+                    }
+                }
+            }
+        )*
+    };
+}
+
+define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));

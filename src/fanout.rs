@@ -1,9 +1,7 @@
+use crate::client::HttpClient;
+use crate::rpc::{RpcRequest, RpcResponse};
 use futures::future::try_join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-
-use crate::utils::{RpcRequest, RpcResponse};
-
-use super::http::HttpClient;
 
 /// A FanoutWrite for fanning JSON-RPC requests to multiple
 /// Clients in a High Availability configuration.

@@ -1,4 +1,4 @@
-use crate::utils::{RpcRequest, RpcResponse, parse_response_payload};
+use crate::rpc::{RpcRequest, RpcResponse, parse_response_payload};
 use alloy_rpc_types_engine::JwtSecret;
 use http::Uri;
 use http_body_util::BodyExt;
@@ -18,7 +18,7 @@ pub type HttpClientService =
     Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
 
 #[derive(Clone, Debug)]
-pub(crate) struct HttpClient {
+pub struct HttpClient {
     client: HttpClientService,
     url: Uri,
 }
