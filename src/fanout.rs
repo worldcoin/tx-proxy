@@ -1,20 +1,7 @@
 use crate::client::HttpClient;
-use crate::utils::{RpcRequest, RpcResponse, parse_response_payload};
-use alloy_rpc_types_engine::JwtSecret;
+use crate::utils::{RpcRequest, RpcResponse};
 use futures::future::try_join_all;
-use http::Uri;
-use http_body_util::BodyExt;
-use hyper_rustls::HttpsConnector;
-use hyper_util::{
-    client::legacy::{Client, connect::HttpConnector},
-    rt::TokioExecutor,
-};
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-use opentelemetry::trace::SpanKind;
-use rollup_boost::{AuthClientLayer, AuthClientService};
-use tower::{Service, ServiceBuilder, ServiceExt};
-use tower_http::decompression::{Decompression, DecompressionLayer};
-use tracing::{debug, instrument};
 
 /// A FanoutWrite for fanning JSON-RPC requests to multiple
 /// Clients in a High Availability configuration.

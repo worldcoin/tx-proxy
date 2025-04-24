@@ -1,6 +1,5 @@
 use crate::utils::{RpcRequest, RpcResponse, parse_response_payload};
 use alloy_rpc_types_engine::JwtSecret;
-use futures::future::try_join_all;
 use http::Uri;
 use http_body_util::BodyExt;
 use hyper_rustls::HttpsConnector;
