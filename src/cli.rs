@@ -1,9 +1,6 @@
 use crate::client::HttpClient;
 use crate::fanout::FanoutWrite;
-use crate::{
-    metrics::init_metrics_server,
-    service::{ProxyLayer, validation::ValidationLayer},
-};
+use crate::{metrics::init_metrics_server, proxy::ProxyLayer, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;

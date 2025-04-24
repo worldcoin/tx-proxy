@@ -3,5 +3,6 @@ pub mod cli;
 pub mod client;
 pub mod fanout;
 pub mod metrics;
-pub mod service;
+pub mod proxy;
 pub mod utils;
+pub mod validation;

@@ -1,5 +1,3 @@
-pub mod validation;
-
 use crate::fanout::FanoutWrite;
 use crate::utils::RpcRequest;
 use jsonrpsee::{
@@ -73,13 +71,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        net::SocketAddr,
-        sync::{Arc, Mutex},
-    };
-
-    use super::{validation::ValidationLayer, *};
     use crate::client::HttpClient as TxProxyHttpClient;
+    use crate::fanout::FanoutWrite;
+    use crate::proxy::ProxyLayer;
+    use crate::validation::ValidationLayer;
     use alloy_primitives::{Bytes, bytes, hex};
     use alloy_rpc_types_engine::JwtSecret;
     use eyre::Result;
@@ -96,6 +91,10 @@ mod tests {
     };
     use rollup_boost::HealthLayer;
     use serde_json::json;
+    use std::{
+        net::SocketAddr,
+        sync::{Arc, Mutex},
+    };
     use tokio::{net::TcpListener, task::JoinHandle};
 
     struct TestHarness {
