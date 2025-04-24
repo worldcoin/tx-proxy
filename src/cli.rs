@@ -87,6 +87,10 @@ pub struct Cli {
 
 impl Cli {
     pub async fn run(self) -> Result<()> {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("TLS Error: Failed to install default provider");
+
         self.init_tracing()?;
         self.init_metrics()?;
 

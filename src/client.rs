@@ -18,7 +18,7 @@ pub type HttpClientService =
     Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
 
 #[derive(Clone, Debug)]
-pub(crate) struct HttpClient {
+pub struct HttpClient {
     client: HttpClientService,
     url: Uri,
 }
