@@ -1,3 +1,6 @@
+use crate::{
+    client::HttpClient, fanout::FanoutWrite, proxy::ProxyLayer, validation::ValidationLayer,
+};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
@@ -27,9 +30,6 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
-use tx_proxy::client::HttpClient;
-use tx_proxy::fanout::FanoutWrite;
-use tx_proxy::{proxy::ProxyLayer, validation::ValidationLayer};
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;
 pub const DEFAULT_METRICS_PORT: u16 = 9090;

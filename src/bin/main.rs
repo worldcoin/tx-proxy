@@ -1,5 +1,5 @@
 use clap::Parser;
-mod cli;
+use tx_proxy::cli;
 
 #[tokio::main]
 async fn main() {
