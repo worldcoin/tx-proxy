@@ -1,4 +1,5 @@
-use crate::client::{FanoutWrite, HttpClient};
+use crate::client::HttpClient;
+use crate::fanout::FanoutWrite;
 use crate::{
     metrics::init_metrics_server,
     service::{ProxyLayer, validation::ValidationLayer},

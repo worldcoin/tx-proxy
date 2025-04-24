@@ -1,6 +1,7 @@
 pub mod validation;
 
-use crate::{client::FanoutWrite, utils::RpcRequest};
+use crate::fanout::FanoutWrite;
+use crate::utils::RpcRequest;
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
