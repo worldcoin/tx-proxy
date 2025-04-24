@@ -10,7 +10,7 @@ use jsonrpsee::{
 use tower::{Layer, Service};
 use tracing::debug;
 
-use crate::{fanout::FanoutWrite, utils::RpcRequest};
+use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ValidationLayer {

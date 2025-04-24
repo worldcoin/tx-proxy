@@ -1,5 +1,5 @@
 use crate::client::HttpClient;
-use crate::utils::{RpcRequest, RpcResponse};
+use crate::rpc::{RpcRequest, RpcResponse};
 use futures::future::try_join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
 

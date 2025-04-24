@@ -1,5 +1,5 @@
 use crate::fanout::FanoutWrite;
-use crate::utils::RpcRequest;
+use crate::rpc::RpcRequest;
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},

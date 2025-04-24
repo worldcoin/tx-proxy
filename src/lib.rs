@@ -4,5 +4,5 @@ pub mod client;
 pub mod fanout;
 pub mod metrics;
 pub mod proxy;
-pub mod utils;
+pub mod rpc;
 pub mod validation;
