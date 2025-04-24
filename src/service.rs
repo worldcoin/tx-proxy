@@ -1,17 +1,15 @@
 pub mod validation;
 
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
-
+use crate::{client::FanoutWrite, utils::RpcRequest};
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
 };
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 use tower::{Layer, Service};
-
-use crate::{client::fanout::FanoutWrite, utils::RpcRequest};
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
@@ -80,7 +78,7 @@ mod tests {
     };
 
     use super::{validation::ValidationLayer, *};
-    use crate::client::http::HttpClient as TxProxyHttpClient;
+    use crate::client::HttpClient as TxProxyHttpClient;
     use alloy_primitives::{Bytes, bytes, hex};
     use alloy_rpc_types_engine::JwtSecret;
     use eyre::Result;
