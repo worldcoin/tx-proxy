@@ -42,3 +42,8 @@ futures = "0.3.31"
 [dev-dependencies]
 ctor = "0.3.5"
 alloy-primitives = "0.8.25"
+
+
+[[bin]]
+name = "tx-proxy"
+path = "bin/tx-proxy/main.rs"

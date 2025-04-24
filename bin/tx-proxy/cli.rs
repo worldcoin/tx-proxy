@@ -1,13 +1,15 @@
-use crate::client::HttpClient;
-use crate::fanout::FanoutWrite;
-use crate::{metrics::init_metrics_server, proxy::ProxyLayer, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
 use eyre::{Result, eyre};
+use http::{Request, Response, StatusCode};
 use hyper::Uri;
+use hyper::{server::conn::http1, service::service_fn};
+use hyper_util::rt::TokioIo;
+use jsonrpsee::http_client::HttpBody;
 use jsonrpsee::{RpcModule, server::Server};
 use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_exporter_prometheus::PrometheusHandle;
 use metrics_util::layers::{PrefixLayer, Stack};
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::{KeyValue, global};
@@ -17,14 +19,17 @@ use paste::paste;
 use rollup_boost::{HealthLayer, LogFormat};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+use tokio::net::TcpListener;
 use tracing::Level;
-use tracing::error;
-use tracing::info;
 use tracing::level_filters::LevelFilter;
+use tracing::{error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
+use tx_proxy::client::HttpClient;
+use tx_proxy::fanout::FanoutWrite;
+use tx_proxy::{proxy::ProxyLayer, validation::ValidationLayer};
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;
 pub const DEFAULT_METRICS_PORT: u16 = 9090;
@@ -235,6 +240,46 @@ impl Cli {
         }
 
         Ok(())
+    }
+}
+
+pub(crate) async fn init_metrics_server(
+    addr: SocketAddr,
+    handle: PrometheusHandle,
+) -> eyre::Result<()> {
+    let listener = TcpListener::bind(addr).await?;
+    info!("Metrics server running on {}", addr);
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let handle = handle.clone(); // Clone the handle for each connection
+                tokio::task::spawn(async move {
+                    let service = service_fn(move |_req: Request<hyper::body::Incoming>| {
+                        let response = match _req.uri().path() {
+                            "/metrics" => Response::builder()
+                                .header("content-type", "text/plain")
+                                .body(HttpBody::from(handle.render()))
+                                .unwrap(),
+                            _ => Response::builder()
+                                .status(StatusCode::NOT_FOUND)
+                                .body(HttpBody::empty())
+                                .unwrap(),
+                        };
+                        async { Ok::<_, hyper::Error>(response) }
+                    });
+
+                    let io = TokioIo::new(stream);
+
+                    if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                        error!(message = "Error serving metrics connection", error = %err);
+                    }
+                });
+            }
+            Err(e) => {
+                error!(message = "Error accepting connection", error = %e);
+            }
+        }
     }
 }
 
