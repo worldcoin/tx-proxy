@@ -1,18 +1,10 @@
-#![cfg_attr(not(test), warn(unused_crate_dependencies))]
 use clap::Parser;
-
-mod cli;
-mod client;
-mod fanout;
-mod metrics;
-mod service;
-mod utils;
-
+use tx_proxy::cli::Cli;
 #[tokio::main]
 async fn main() {
     init_tls();
 
-    let cli = cli::Cli::parse();
+    let cli = Cli::parse();
 
     if let Err(e) = cli.run().await {
         eprintln!("Fatal Error: {}", e);
