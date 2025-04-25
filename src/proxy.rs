@@ -127,32 +127,38 @@ mod tests {
                 format!("http://{}:{}", builder_0.addr.ip(), builder_0.addr.port())
                     .parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
 
             let builder_1_http_client = TxProxyHttpClient::new(
                 format!("http://{}:{}", builder_1.addr.ip(), builder_1.addr.port())
                     .parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
             let builder_2_http_client = TxProxyHttpClient::new(
                 format!("http://{}:{}", builder_2.addr.ip(), builder_2.addr.port())
                     .parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
 
             let l2_0_http_client = TxProxyHttpClient::new(
                 format!("http://{}:{}", l2_0.addr.ip(), l2_0.addr.port()).parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
 
             let l2_1_http_client = TxProxyHttpClient::new(
                 format!("http://{}:{}", l2_1.addr.ip(), l2_1.addr.port()).parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
 
             let l2_2_http_client = TxProxyHttpClient::new(
                 format!("http://{}:{}", l2_2.addr.ip(), l2_2.addr.port()).parse::<Uri>()?,
                 JwtSecret::random(),
+                1000,
             );
 
             let builder_fanout = FanoutWrite::new(vec![

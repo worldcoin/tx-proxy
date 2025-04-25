@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::rpc::{RpcRequest, RpcResponse, parse_response_payload};
 use alloy_rpc_types_engine::JwtSecret;
 use http::Uri;
@@ -10,12 +12,15 @@ use hyper_util::{
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
 use opentelemetry::trace::SpanKind;
 use rollup_boost::{AuthClientLayer, AuthClientService};
-use tower::{Service, ServiceBuilder, ServiceExt};
+use tower::{
+    Service, ServiceBuilder, ServiceExt,
+    timeout::{Timeout, TimeoutLayer},
+};
 use tower_http::decompression::{Decompression, DecompressionLayer};
 use tracing::{debug, instrument};
 
 pub type HttpClientService =
-    Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>;
+    Timeout<Decompression<AuthClientService<Client<HttpsConnector<HttpConnector>, HttpBody>>>>;
 
 #[derive(Clone, Debug)]
 pub struct HttpClient {
@@ -24,7 +29,7 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    pub fn new(url: Uri, secret: JwtSecret) -> Self {
+    pub fn new(url: Uri, secret: JwtSecret, timeout: u64) -> Self {
         let connector = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .expect("no native root CA certificates found")
@@ -36,6 +41,7 @@ impl HttpClient {
         let client = Client::builder(TokioExecutor::new()).build(connector);
 
         let client = ServiceBuilder::new()
+            .layer(TimeoutLayer::new(Duration::from_millis(timeout)))
             .layer(DecompressionLayer::new())
             .layer(AuthClientLayer::new(secret))
             .service(client);
