@@ -38,13 +38,12 @@ impl HttpClient {
             .enable_http2()
             .build();
 
-        let client = Client::builder(TokioExecutor::new()).build(connector);
-
+        let client_builder = Client::builder(TokioExecutor::new());
         let client = ServiceBuilder::new()
             .layer(TimeoutLayer::new(Duration::from_millis(timeout)))
             .layer(DecompressionLayer::new())
             .layer(AuthClientLayer::new(secret))
-            .service(client);
+            .service(client_builder.build(connector));
 
         Self { client, url }
     }
