@@ -1,6 +1,4 @@
-use crate::{
-    client::HttpClient, fanout::FanoutWrite, proxy::ProxyLayer, validation::ValidationLayer,
-};
+use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
@@ -38,9 +36,6 @@ pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
 #[derive(clap::Parser)]
 #[clap(about, version, author)]
 pub struct Cli {
-    #[clap(flatten)]
-    pub l2_targets: L2Targets,
-
     #[clap(flatten)]
     pub builder_targets: BuilderTargets,
 
@@ -96,13 +91,11 @@ impl Cli {
         self.init_tracing()?;
         self.init_metrics()?;
 
-        let l2_targets = self.l2_targets.build()?;
         let builder_targets = self.builder_targets.build()?;
 
         let middleware = tower::ServiceBuilder::new()
             .layer(HealthLayer)
-            .layer(ValidationLayer::new(builder_targets))
-            .layer(ProxyLayer::new(l2_targets));
+            .layer(ValidationLayer::new(builder_targets));
 
         let server = Server::builder()
             .set_http_middleware(middleware)
@@ -340,4 +333,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
+define_rpc_args!((BuilderTargets, builder));
