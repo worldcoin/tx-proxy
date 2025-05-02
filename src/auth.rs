@@ -76,7 +76,6 @@ where
 
 /// A future representing the response of an RPC request
 #[pin_project]
-#[expect(missing_debug_implementations)]
 pub struct ResponseFuture<F> {
     /// The kind of response future, error or pending
     #[pin]
