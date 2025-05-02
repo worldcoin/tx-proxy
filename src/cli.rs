@@ -1,3 +1,4 @@
+use crate::auth::{AuthLayer, JwtAuthValidator};
 use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
@@ -8,6 +9,7 @@ use hyper::Uri;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
 use jsonrpsee::http_client::HttpBody;
+use jsonrpsee::server::ServerHandle;
 use jsonrpsee::{RpcModule, server::Server};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_exporter_prometheus::PrometheusHandle;
@@ -38,6 +40,14 @@ pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
 pub struct Cli {
     #[clap(flatten)]
     pub builder_targets: BuilderTargets,
+
+    /// JWT Secret for the RPC server
+    #[clap(long, env, value_name = "HEX")]
+    pub jwt_token: Option<JwtSecret>,
+
+    /// Path to a JWT secret for the RPC server
+    #[clap(long, env, value_name = "PATH")]
+    pub jwt_path: Option<PathBuf>,
 
     /// The address to bind the HTTP server to.
     #[clap(long, env, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
@@ -91,25 +101,8 @@ impl Cli {
         self.init_tracing()?;
         self.init_metrics()?;
 
-        let builder_targets = self.builder_targets.build()?;
-
-        let middleware = tower::ServiceBuilder::new()
-            .layer(HealthLayer)
-            .layer(ValidationLayer::new(builder_targets));
-
-        let server = Server::builder()
-            .set_http_middleware(middleware)
-            .max_connections(self.max_concurrent_connections)
-            .build(format!("{}:{}", self.http_addr, self.http_port))
-            .await?;
-
-        info!(
-            target: "tx-proxy::cli",
-            url = %server.local_addr()?,
-            "Transaction Proxy Server Started"
-        );
-
-        let handle = server.start(RpcModule::new(()));
+        let jwt_secret = self.jwt_secret()?;
+        let handle = self.serve(jwt_secret).await?;
 
         let stopped_handle = handle.clone();
         let shutdown_handle = handle.clone();
@@ -233,6 +226,48 @@ impl Cli {
         }
 
         Ok(())
+    }
+
+    async fn serve(&self, jwt_secret: Option<JwtSecret>) -> Result<ServerHandle> {
+        let module = RpcModule::new(());
+        if let Some(secret) = jwt_secret {
+            let middleware = tower::ServiceBuilder::new()
+                .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
+                .layer(HealthLayer)
+                .layer(ValidationLayer::new(self.builder_targets.build()?));
+            let server = Server::builder()
+                .set_http_middleware(middleware)
+                .max_connections(self.max_concurrent_connections)
+                .build(format!("{}:{}", self.http_addr, self.http_port))
+                .await?;
+
+            info!(target: "tx-proxy::cli", addr = %server.local_addr()?, "Building Authenticated RPC server");
+
+            Ok(server.start(module))
+        } else {
+            let middleware = tower::ServiceBuilder::new()
+                .layer(HealthLayer)
+                .layer(ValidationLayer::new(self.builder_targets.build()?));
+            let server = Server::builder()
+                .set_http_middleware(middleware)
+                .max_connections(self.max_concurrent_connections)
+                .build(format!("{}:{}", self.http_addr, self.http_port))
+                .await?;
+
+            info!(target: "tx-proxy::cli", addr = %server.local_addr()?, "Building Unauthenticated RPC server");
+
+            Ok(server.start(module))
+        }
+    }
+
+    pub fn jwt_secret(&self) -> Result<Option<JwtSecret>> {
+        if let Some(secret) = &self.jwt_token {
+            Ok(Some(*secret))
+        } else if let Some(path) = &self.jwt_path {
+            Ok(Some(JwtSecret::from_file(path)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
