@@ -16,7 +16,7 @@ http-body-util = "0.1.3"
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-rustls = "0.27.5"
 hyper-util = { version = "0.1.11", features = ["full"] }
-jsonrpsee = { version = "0.24", features = ["server", "http-client", "macros"] }
+jsonrpsee = { version = "0.24", features = ["server", "http-client", "macros", "client"] }
 paste = "1.0.15"
 rustls = { version = "0.23.25", features = ["ring"] }
 serde_json = "1.0.140"
@@ -38,10 +38,12 @@ opentelemetry-otlp = { version = "0.28.0", features = [
 opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.29.0"
 futures = "0.3.31"
+pin-project = "1.1.10"
 
 [dev-dependencies]
 ctor = "0.3.5"
 alloy-primitives = "0.8.25"
+reqwest = "0.12.15"
 
 [[bin]]
 name = "tx-proxy"
