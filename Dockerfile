@@ -49,6 +49,6 @@ WORKDIR /app
 ARG TX_PROXY_BIN="tx-proxy"
 COPY --from=builder /app/target/release/${TX_PROXY_BIN} /usr/local/bin/
 
-EXPOSE 8545
+EXPOSE 8545 9001
 
 ENTRYPOINT ["/usr/local/bin/tx-proxy"]
