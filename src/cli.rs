@@ -23,6 +23,7 @@ use rollup_boost::{HealthLayer, LogFormat};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use tokio::net::TcpListener;
+use tokio::signal::unix::{SignalKind, signal};
 use tracing::Level;
 use tracing::level_filters::LevelFilter;
 use tracing::{error, info};
@@ -104,8 +105,11 @@ impl Cli {
         let jwt_secret = self.jwt_secret()?;
         let handle = self.serve(jwt_secret).await?;
 
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+
         let stopped_handle = handle.clone();
         let shutdown_handle = handle.clone();
+        let force_handle = handle.clone();
 
         tokio::select! {
             _ = stopped_handle.stopped() => {
@@ -115,6 +119,11 @@ impl Cli {
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
                 shutdown_handle.stop()?;
+                Ok(())
+            }
+            _ = sigterm.recv() => {
+                error!("Received SIGTERM, shutting down...");
+                force_handle.stop()?;
                 Ok(())
             }
         }
