@@ -129,10 +129,17 @@ impl Cli {
                 .push(PrefixLayer::new("tx-proxy"))
                 .install()?;
 
-            // Start the metrics server
+            // Start the metrics server with proper error handling
             let metrics_addr = format!("{}:{}", self.metrics_host, self.metrics_port);
             let addr: SocketAddr = metrics_addr.parse()?;
-            tokio::spawn(init_metrics_server(addr, handle)); // Run the metrics server in a separate task
+
+            // Single task that both runs and monitors the metrics server
+            tokio::spawn(async move {
+                if let Err(e) = init_metrics_server(addr, handle).await {
+                    error!("Metrics server failed to start: {}", e);
+                    std::process::exit(1);
+                }
+            });
         }
 
         Ok(())
