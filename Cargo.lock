@@ -4533,6 +4533,7 @@ dependencies = [
  "alloy-rpc-types-engine",
  "clap",
  "ctor",
+ "dotenv",
  "eyre",
  "futures",
  "http",
