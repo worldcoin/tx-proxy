@@ -244,10 +244,11 @@ impl Cli {
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
                 .layer(HealthLayer)
                 .layer(ValidationLayer::new(self.builder_targets.build()?));
+
             let server = Server::builder()
                 .set_http_middleware(middleware)
                 .max_connections(self.max_concurrent_connections)
-                .build(format!("{}:{}", self.http_addr, self.http_port))
+                .build(SocketAddr::new(self.http_addr, self.http_port))
                 .await?;
 
             info!(target: "tx-proxy::cli", addr = %server.local_addr()?, "Building Authenticated RPC server");
