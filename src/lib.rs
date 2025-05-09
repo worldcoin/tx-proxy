@@ -1,4 +1,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
+use dotenv as _;
+
 pub mod auth;
 pub mod cli;
 pub mod client;
