@@ -99,7 +99,7 @@ impl Cli {
             .expect("TLS Error: Failed to install default provider");
 
         self.init_tracing()?;
-        self.init_metrics()?;
+        let metrics_handle = self.init_metrics().await?;
 
         let jwt_secret = self.jwt_secret()?;
         let handle = self.serve(jwt_secret).await?;
@@ -108,6 +108,7 @@ impl Cli {
         let shutdown_handle = handle.clone();
 
         tokio::select! {
+            // Handle the main server stopping
             _ = stopped_handle.stopped() => {
                 error!("Server stopped unexpectedly or crashed");
                 Err(eyre::eyre!("Server stopped unexpectedly or crashed"))
@@ -115,12 +116,22 @@ impl Cli {
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
                 shutdown_handle.stop()?;
+                // metrics_handle.abort();
                 Ok(())
+            }
+            // Handle the metrics server stopping
+            result = metrics_handle => {
+                if let Err(e) = result {
+                    error!("Metrics server crashed: {}", e);
+                    Err(eyre::eyre!("Metrics server stopped unexpectedly, shutting down..."))
+                } else {
+                    Ok(())
+                }
             }
         }
     }
 
-    fn init_metrics(&self) -> Result<()> {
+    async fn init_metrics(&self) -> Result<tokio::task::JoinHandle<()>> {
         if self.metrics {
             let recorder = PrometheusBuilder::new().build_recorder();
             let handle = recorder.handle();
@@ -133,16 +144,17 @@ impl Cli {
             let metrics_addr = format!("{}:{}", self.metrics_host, self.metrics_port);
             let addr: SocketAddr = metrics_addr.parse()?;
 
-            // Single task that both runs and monitors the metrics server
-            tokio::spawn(async move {
-                if let Err(e) = init_metrics_server(addr, handle).await {
-                    error!("Metrics server failed to start: {}", e);
-                    std::process::exit(1);
-                }
-            });
-        }
+            // Try to bind the listener first to catch startup errors
+            let listener = TcpListener::bind(addr).await?;
+            info!("Metrics server running on {}", addr);
 
-        Ok(())
+            // Now spawn the server task and return its handle
+            Ok(tokio::spawn(async move {
+                init_metrics_server(listener, handle).await;
+            }))
+        } else {
+            Ok(tokio::spawn(async {}))
+        }
     }
 
     fn init_tracing(&self) -> Result<()> {
@@ -279,16 +291,13 @@ impl Cli {
 }
 
 pub(crate) async fn init_metrics_server(
-    addr: SocketAddr,
+    listener: TcpListener,
     handle: PrometheusHandle,
 ) -> eyre::Result<()> {
-    let listener = TcpListener::bind(addr).await?;
-    info!("Metrics server running on {}", addr);
-
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {
-                let handle = handle.clone(); // Clone the handle for each connection
+                let handle = handle.clone();
                 tokio::task::spawn(async move {
                     let service = service_fn(move |_req: Request<hyper::body::Incoming>| {
                         let response = match _req.uri().path() {
@@ -305,7 +314,6 @@ pub(crate) async fn init_metrics_server(
                     });
 
                     let io = TokioIo::new(stream);
-
                     if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
                         error!(message = "Error serving metrics connection", error = %err);
                     }
