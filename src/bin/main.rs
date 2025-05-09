@@ -1,6 +1,6 @@
 use clap::Parser;
-use tx_proxy::cli;
 use dotenv::dotenv;
+use tx_proxy::cli;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
