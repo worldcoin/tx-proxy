@@ -120,7 +120,6 @@ impl Cli {
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
                 shutdown_handle.stop()?;
-                // metrics_handle.abort();
                 Ok(())
             }
             _ = sigterm.recv() => {
@@ -136,6 +135,7 @@ impl Cli {
                 } else {
                     Ok(())
                 }
+            }
         }
     }
 
