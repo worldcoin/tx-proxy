@@ -30,13 +30,16 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(url: Uri, secret: JwtSecret, timeout: u64) -> Self {
-        let connector = hyper_rustls::HttpsConnectorBuilder::new()
+        let builder = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
-            .expect("no native root CA certificates found")
-            .https_only()
-            .enable_http1()
-            .enable_http2()
-            .build();
+            .expect("no native root CA certificates found");
+
+        #[cfg(not(test))]
+        let builder = builder.https_only();
+        #[cfg(test)]
+        let builder = builder.https_or_http();
+
+        let connector = builder.enable_http1().enable_http2().build();
 
         let client_builder = Client::builder(TokioExecutor::new());
         let client = ServiceBuilder::new()
