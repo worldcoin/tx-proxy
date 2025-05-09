@@ -367,8 +367,8 @@ macro_rules! define_rpc_args {
 
                     pub fn build(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
-                        let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt.clone(), self.[<$prefix _timeout>]);
-                        let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt.clone(), self.[<$prefix _timeout>]);
+                        let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt, self.[<$prefix _timeout>]);
+                        let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt, self.[<$prefix _timeout>]);
                         let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt, self.[<$prefix _timeout>]);
                         Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
                     }
