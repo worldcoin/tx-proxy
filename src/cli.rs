@@ -104,26 +104,20 @@ impl Cli {
 
         let jwt_secret = self.jwt_secret()?;
         let handle = self.serve(jwt_secret).await?;
-
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
-
-        let stopped_handle = handle.clone();
-        let shutdown_handle = handle.clone();
-        let force_handle = handle.clone();
-
         tokio::select! {
-            _ = stopped_handle.stopped() => {
+            _ = handle.clone().stopped() => {
                 error!("Server stopped unexpectedly or crashed");
                 Err(eyre::eyre!("Server stopped unexpectedly or crashed"))
             }
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
-                shutdown_handle.stop()?;
+                handle.stop()?;
                 Ok(())
             }
             _ = sigterm.recv() => {
                 error!("Received SIGTERM, shutting down...");
-                force_handle.stop()?;
+                handle.stop()?;
                 Ok(())
             }
         }
