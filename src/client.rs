@@ -33,7 +33,7 @@ impl HttpClient {
         let connector = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .expect("no native root CA certificates found")
-            .https_or_http()
+            .https_only()
             .enable_http1()
             .enable_http2()
             .build();
