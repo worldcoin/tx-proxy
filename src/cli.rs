@@ -89,7 +89,7 @@ pub struct Cli {
     /// Maximum number of concurrent connections to allow.
     ///
     /// Defaults to 500.
-    #[clap(long = "http.max-concurrent-connections", default_value_t = 500)]
+    #[clap(long = "http.max-concurrent-connections", env, default_value_t = 500)]
     pub max_concurrent_connections: u32,
 }
 
