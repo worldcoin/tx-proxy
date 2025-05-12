@@ -4,6 +4,9 @@ use jsonrpsee::{
     http_client::HttpBody,
     types::{ErrorObjectOwned, Request, Response, ResponsePayload, error::INTERNAL_ERROR_CODE},
 };
+
+pub const MAX_REQUEST_BODY_SIZE: u32 = 15_000_000; // 15MB
+
 /// Decomposed JSON-RPC request.
 #[derive(Clone, Debug)]
 pub struct RpcRequest {
@@ -15,7 +18,8 @@ pub struct RpcRequest {
 impl RpcRequest {
     pub async fn from_request(request: http::Request<HttpBody>) -> Result<Self> {
         let (parts, body) = request.into_parts();
-        let (body_bytes, _) = http_helpers::read_body(&parts.headers, body, u32::MAX).await?;
+        let (body_bytes, _) =
+            http_helpers::read_body(&parts.headers, body, MAX_REQUEST_BODY_SIZE).await?;
         let method = serde_json::from_slice::<Request>(&body_bytes)?
             .method
             .to_string();
