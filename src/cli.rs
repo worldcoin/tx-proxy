@@ -99,12 +99,14 @@ impl Cli {
             .install_default()
             .expect("TLS Error: Failed to install default provider");
 
+        let (metrics_shutdown_sender, metrics_shutdown_receiver) = tokio::sync::oneshot::channel();
         self.init_tracing()?;
-        self.init_metrics()?;
+        self.init_metrics(metrics_shutdown_sender)?;
 
         let jwt_secret = self.jwt_secret()?;
         let handle = self.serve(jwt_secret).await?;
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
+
         tokio::select! {
             _ = handle.clone().stopped() => {
                 error!("Server stopped unexpectedly or crashed");
@@ -112,6 +114,11 @@ impl Cli {
             }
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
+                handle.stop()?;
+                Ok(())
+            }
+            _ = metrics_shutdown_receiver => {
+                error!("Metrics server shut down, shutting down...");
                 handle.stop()?;
                 Ok(())
             }
@@ -123,7 +130,7 @@ impl Cli {
         }
     }
 
-    fn init_metrics(&self) -> Result<()> {
+    fn init_metrics(&self, shutdown_sender: tokio::sync::oneshot::Sender<()>) -> Result<()> {
         if self.metrics {
             let recorder = PrometheusBuilder::new().build_recorder();
             let handle = recorder.handle();
@@ -135,7 +142,12 @@ impl Cli {
             // Start the metrics server
             let metrics_addr = format!("{}:{}", self.metrics_host, self.metrics_port);
             let addr: SocketAddr = metrics_addr.parse()?;
-            tokio::spawn(init_metrics_server(addr, handle)); // Run the metrics server in a separate task
+            tokio::spawn(async move {
+                if let Err(e) = init_metrics_server(addr, handle).await {
+                    error!(message = "Error starting metrics server", error = %e);
+                }
+                let _ = shutdown_sender.send(());
+            });
         }
 
         Ok(())
@@ -303,9 +315,9 @@ pub(crate) async fn init_metrics_server(
 
                     let io = TokioIo::new(stream);
 
-                    if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
-                        error!(message = "Error serving metrics connection", error = %err);
-                    }
+                    http1::Builder::new().serve_connection(io, service).await?;
+
+                    Ok::<_, hyper::Error>(())
                 });
             }
             Err(e) => {
