@@ -1,4 +1,4 @@
-use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, errors::ErrorKind};
 use pin_project::pin_project;
 use std::{
     pin::Pin,
