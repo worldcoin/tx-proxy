@@ -314,8 +314,9 @@ pub(crate) async fn init_metrics_server(
                     });
 
                     let io = TokioIo::new(stream);
-
-                    http1::Builder::new().serve_connection(io, service).await?;
+                    if let Err(e) = http1::Builder::new().serve_connection(io, service).await {
+                        error!(message = "Error serving connection", error = %e);
+                    }
 
                     Ok::<_, hyper::Error>(())
                 });
