@@ -1,10 +1,11 @@
+use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use pin_project::pin_project;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 
-use alloy_rpc_types_engine::{JwtError, JwtSecret};
+use alloy_rpc_types_engine::{Claims, JwtError, JwtSecret};
 use http::{HeaderMap, Response, StatusCode, header};
 use jsonrpsee::{
     http_client::{HttpBody, HttpResponse},
@@ -146,7 +147,7 @@ impl JwtAuthValidator {
 impl JwtAuthValidator {
     pub fn validate(&self, headers: &HeaderMap) -> Result<(), HttpResponse> {
         match get_bearer(headers) {
-            Some(jwt) => match self.secret.validate(&jwt) {
+            Some(jwt) => match validate(&self.secret, &jwt) {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     error!(target: "tx-proxy::jwt-validator", "Invalid JWT: {e}");
@@ -162,6 +163,31 @@ impl JwtAuthValidator {
             }
         }
     }
+}
+
+pub fn validate(secret: &JwtSecret, jwt: &str) -> Result<(), JwtError> {
+    // Create a new validation object with the required signature algorithm
+    // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
+    let validation = Validation::new(Algorithm::HS256);
+    let bytes = secret.as_bytes();
+
+    match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
+        Ok(token) => {
+            if !token.claims.is_within_time_window() {
+                Err(JwtError::InvalidIssuanceTimestamp)?
+            }
+        }
+        Err(err) => match *err.kind() {
+            ErrorKind::InvalidSignature => Err(JwtError::InvalidSignature)?,
+            ErrorKind::InvalidAlgorithm => Err(JwtError::UnsupportedSignatureAlgorithm)?,
+            _ => {
+                let detail = format!("{err}");
+                Err(JwtError::JwtDecodingError(detail))?
+            }
+        },
+    };
+
+    Ok(())
 }
 
 /// This is an utility function that retrieves a bearer
