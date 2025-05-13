@@ -132,10 +132,11 @@ impl Cli {
                 .push(PrefixLayer::new("tx-proxy"))
                 .install()?;
 
-            // Start the metrics server
-            let metrics_addr = format!("{}:{}", self.metrics_host, self.metrics_port);
-            let addr: SocketAddr = metrics_addr.parse()?;
-            tokio::spawn(init_metrics_server(addr, handle)); // Run the metrics server in a separate task
+            // Run the metrics server in a separate task
+            tokio::spawn(init_metrics_server(
+                SocketAddr::new(self.metrics_host, self.metrics_port),
+                handle,
+            ));
         }
 
         Ok(())
