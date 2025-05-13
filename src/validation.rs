@@ -14,7 +14,7 @@ use tracing::{debug, instrument};
 use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 
 pub const ALLOWED_METHODS: &[&str; 3] = &[
-    "eth_sendRawTransactionPass",
+    "eth_sendRawTransaction",
     "eth_sendRawTransactionConditional",
     "eth_chainId",
 ];

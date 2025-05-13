@@ -219,7 +219,7 @@ mod tests {
             let method = request_body["method"].as_str().unwrap_or_default();
 
             let response = match method {
-                "eth_sendRawTransactionPass" => json!({
+                "eth_sendRawTransaction" => json!({
                     "jsonrpc": "2.0",
                     "result": format!("{}", bytes!("1234")),
                     "id": request_body["id"]
@@ -260,7 +260,7 @@ mod tests {
         let test_harness = TestHarness::new().await?;
 
         let expected_tx: Bytes = hex!("1234").into();
-        let expected_method = "eth_sendRawTransactionPass";
+        let expected_method = "eth_sendRawTransaction";
 
         test_harness
             .proxy_client
