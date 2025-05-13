@@ -39,7 +39,6 @@ opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.29.0"
 futures = "0.3.31"
 pin-project = "1.1.10"
-thiserror = "2.0.12"
 
 [dev-dependencies]
 ctor = "0.3.5"

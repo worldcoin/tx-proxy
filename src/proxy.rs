@@ -9,13 +9,6 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum ProxyError {
-    #[error("Disallowed method: {0}")]
-    DisallowedMethod(String),
-}
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
@@ -67,17 +60,6 @@ where
         service.inner = std::mem::replace(&mut self.inner, service.inner);
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-
-            let allowed_methods = [
-                "eth_sendRawTransaction",
-                "eth_sendRawTransactionPass",
-            ];
-            
-            if !allowed_methods.contains(&rpc_request.method.as_str()) {
-                eprintln!("Disallowed method: {}", rpc_request.method);
-                return Err(Box::new(ProxyError::DisallowedMethod(rpc_request.method)));
-            }
-
             let mut result = fanout.fan_request(rpc_request.clone()).await?;
 
             Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
