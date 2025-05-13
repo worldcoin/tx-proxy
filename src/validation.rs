@@ -13,10 +13,10 @@ use tracing::debug;
 
 use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 
-pub const ALLOWED_METHODS: &[&str; 2] = &[
+pub const ALLOWED_METHODS: &[&str; 3] = &[
     "eth_sendRawTransactionPass",
     "eth_sendRawTransactionConditional",
-    // TODO: Add all ProxyD required methods here
+    "eth_chainId"
 ];
 
 fn check_allowed_methods(method: &str) -> eyre::Result<()> {
