@@ -9,7 +9,7 @@ use jsonrpsee::{
     http_client::{HttpBody, HttpRequest, HttpResponse},
 };
 use tower::{Layer, Service};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 
@@ -71,6 +71,7 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
+    #[instrument(skip(self, request), target = "tx-proxy::validation")]
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
         let mut fanout = self.fanout.clone();
