@@ -16,7 +16,7 @@ use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 pub const ALLOWED_METHODS: &[&str; 3] = &[
     "eth_sendRawTransactionPass",
     "eth_sendRawTransactionConditional",
-    "eth_chainId"
+    "eth_chainId",
 ];
 
 fn check_allowed_methods(method: &str) -> eyre::Result<()> {
