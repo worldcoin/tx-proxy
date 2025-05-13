@@ -9,6 +9,13 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ProxyError {
+    #[error("Disallowed method: {0}")]
+    DisallowedMethod(String),
+}
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
@@ -60,6 +67,17 @@ where
         service.inner = std::mem::replace(&mut self.inner, service.inner);
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
+
+            let allowed_methods = [
+                "eth_sendRawTransaction",
+                "eth_sendRawTransactionPass",
+            ];
+            
+            if !allowed_methods.contains(&rpc_request.method.as_str()) {
+                eprintln!("Disallowed method: {}", rpc_request.method);
+                return Err(Box::new(ProxyError::DisallowedMethod(rpc_request.method)));
+            }
+
             let mut result = fanout.fan_request(rpc_request.clone()).await?;
 
             Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
@@ -436,6 +454,27 @@ mod tests {
 
         send_request("eth_sendRawTransactionValidationFail").await;
         assert_validation_fail_case(&test_harness, 1).await;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_send_raw_transaction_with_forbidden_method() -> Result<()> {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        let test_harness = TestHarness::new().await?;
+
+        let expected_tx: Bytes = hex!("1234").into();
+        let expected_method = "debug_getRawBlock";
+
+        let result = test_harness
+            .proxy_client
+            .request::<serde_json::Value, _>(expected_method, (expected_tx.clone(),))
+            .await;
+
+        assert!(result.is_err()); // TODO: match on specific error instead
+
+        eprintln!("result: {:?}", result);
+        eprintln!("result.is_err(): {:?}", result.is_err());
 
         Ok(())
     }
