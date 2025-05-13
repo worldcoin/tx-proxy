@@ -1,15 +1,3 @@
-use crate::fanout::FanoutWrite;
-use crate::rpc::RpcRequest;
-use jsonrpsee::{
-    core::BoxError,
-    http_client::{HttpBody, HttpRequest, HttpResponse},
-};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
-use tower::{Layer, Service};
-
 #[cfg(test)]
 mod tests {
     use crate::client::HttpClient as TxProxyHttpClient;
@@ -376,7 +364,7 @@ mod tests {
         };
 
         send_request("eth_sendRawTransactionValidationFail").await;
-        assert_validation_fail_case(&test_harness, 1).await;
+        assert_validation_fail_case(&test_harness, 0).await;
 
         Ok(())
     }

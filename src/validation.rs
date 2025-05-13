@@ -16,6 +16,7 @@ use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 pub const ALLOWED_METHODS: &[&str; 2] = &[
     "eth_sendRawTransactionPass",
     "eth_sendRawTransactionConditional",
+    // TODO: Add all ProxyD required methods here
 ];
 
 fn check_allowed_methods(method: &str) -> eyre::Result<()> {
