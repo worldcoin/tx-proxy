@@ -3,7 +3,6 @@ use std::{
     task::{Context, Poll},
 };
 
-use eyre::eyre;
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
@@ -18,14 +17,6 @@ pub const ALLOWED_METHODS: &[&str; 3] = &[
     "eth_sendRawTransactionConditional",
     "eth_chainId",
 ];
-
-fn check_allowed_methods(method: &str) -> eyre::Result<()> {
-    if ALLOWED_METHODS.contains(&method) {
-        Ok(())
-    } else {
-        Err(eyre!("Disallowed method: {}", method))
-    }
-}
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ValidationLayer {
@@ -79,7 +70,12 @@ where
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            check_allowed_methods(&rpc_request.method)?;
+            if !ALLOWED_METHODS.contains(&&rpc_request.method[..]) {
+                let res = HttpResponse::builder()
+                    .status(404)
+                    .body(HttpBody::from(format!("Not Found {}", rpc_request.method)))?;
+                return Ok::<HttpResponse<HttpBody>, BoxError>(res);
+            }
 
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
 
