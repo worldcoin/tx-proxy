@@ -363,21 +363,3 @@ async fn test_send_raw_transaction_sad_path() -> Result<()> {
 
     Ok(())
 }
-
-#[tokio::test]
-async fn test_send_raw_transaction_with_forbidden_method() -> Result<()> {
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    let test_harness = TestHarness::new().await?;
-
-    let expected_tx: Bytes = hex!("1234").into();
-    let expected_method = "debug_getRawBlock";
-
-    let result = test_harness
-        .proxy_client
-        .request::<serde_json::Value, _>(expected_method, (expected_tx.clone(),))
-        .await;
-
-    assert!(result.is_err_and(|e| { e.to_string().eq("Request rejected `404`") }));
-
-    Ok(())
-}

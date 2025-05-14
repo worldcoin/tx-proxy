@@ -6,6 +6,7 @@ use std::{
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
+    types::ErrorObject,
 };
 use tower::{Layer, Service};
 use tracing::{debug, instrument};
@@ -71,10 +72,7 @@ where
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
             if !ALLOWED_METHODS.contains(&&rpc_request.method[..]) {
-                let res = HttpResponse::builder()
-                    .status(404)
-                    .body(HttpBody::from(format!("Not Found {}", rpc_request.method)))?;
-                return Ok::<HttpResponse<HttpBody>, BoxError>(res);
+                return Ok::<HttpResponse<HttpBody>, BoxError>(invalid_method_response());
             }
 
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
@@ -109,4 +107,14 @@ where
 
         Box::pin(fut)
     }
+}
+
+fn invalid_method_response() -> HttpResponse {
+    HttpResponse::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(HttpBody::from(
+            ErrorObject::owned(-32601, "Method not found", None::<()>).to_string(),
+        ))
+        .unwrap()
 }
