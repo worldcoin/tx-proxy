@@ -6,6 +6,3 @@ pub mod fanout;
 pub mod proxy;
 pub mod rpc;
 pub mod validation;
-
-#[cfg(test)]
-pub mod tests;

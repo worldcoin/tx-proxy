@@ -1,7 +1,7 @@
-use crate::client::HttpClient as TxProxyHttpClient;
-use crate::fanout::FanoutWrite;
-use crate::proxy::ProxyLayer;
-use crate::validation::ValidationLayer;
+use tx_proxy::client::HttpClient as TxProxyHttpClient;
+use tx_proxy::fanout::FanoutWrite;
+use tx_proxy::proxy::ProxyLayer;
+use tx_proxy::validation::ValidationLayer;
 use alloy_primitives::{Bytes, bytes, hex};
 use alloy_rpc_types_engine::JwtSecret;
 use eyre::Result;
