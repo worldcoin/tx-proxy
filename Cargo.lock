@@ -4548,6 +4548,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "jsonrpsee",
+ "jsonwebtoken",
  "metrics-exporter-prometheus",
  "metrics-util",
  "opentelemetry",
