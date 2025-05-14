@@ -1,4 +1,5 @@
 use crate::auth::{AuthLayer, JwtAuthValidator};
+use crate::proxy::ProxyLayer;
 use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
@@ -42,6 +43,9 @@ pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
 pub struct Cli {
     #[clap(flatten)]
     pub builder_targets: BuilderTargets,
+
+    #[clap(flatten)]
+    pub l2_targets: L2Targets,
 
     /// JWT Secret for the RPC server
     #[clap(long, env, value_name = "HEX")]
@@ -249,7 +253,8 @@ impl Cli {
             let middleware = tower::ServiceBuilder::new()
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?));
+                .layer(ValidationLayer::new(self.builder_targets.build()?))
+                .layer(ProxyLayer::new(self.l2_targets.build()?));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)
@@ -263,7 +268,9 @@ impl Cli {
         } else {
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?));
+                .layer(ValidationLayer::new(self.builder_targets.build()?))
+                .layer(ProxyLayer::new(self.l2_targets.build()?));
+
             let server = Server::builder()
                 .set_http_middleware(middleware)
                 .max_connections(self.max_concurrent_connections)
@@ -334,17 +341,9 @@ macro_rules! define_rpc_args {
             paste! {
                 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
                 pub struct $name {
-                    /// RPC Server 0
+                    /// RPC URLs
                     #[arg(long, env)]
-                    pub [<$prefix _url_0>]: Uri,
-
-                    /// RPC Server 1
-                    #[arg(long, env)]
-                    pub [<$prefix _url_1>]: Uri,
-
-                    /// RPC Server 2
-                    #[arg(long, env)]
-                    pub [<$prefix _url_2>]: Uri,
+                    pub [<$prefix _urls>]: Vec<Uri>,
 
                     /// Hex encoded JWT secret to use for an authenticated RPC server.
                     #[arg(long, env, value_name = "HEX")]
@@ -374,10 +373,14 @@ macro_rules! define_rpc_args {
 
                     pub fn build(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
-                        let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt, self.[<$prefix _timeout>]);
-                        let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt, self.[<$prefix _timeout>]);
-                        let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt, self.[<$prefix _timeout>]);
-                        Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
+                        let backend = self.[<$prefix _urls>]
+                            .iter()
+                            .map(|url| {
+                                HttpClient::new(url.clone(), jwt, self.[<$prefix _timeout>])
+                            })
+                            .collect::<Vec<_>>();
+
+                        Ok(FanoutWrite::new(backend))
                     }
                 }
             }
@@ -385,4 +388,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!((BuilderTargets, builder));
+define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
