@@ -40,6 +40,7 @@ tracing-opentelemetry = "0.29.0"
 futures = "0.3.31"
 pin-project = "1.1.10"
 jsonwebtoken = "9.3.1"
+dotenvy = "0.15.7"
 
 [dev-dependencies]
 ctor = "0.3.5"

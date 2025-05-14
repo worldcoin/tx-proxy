@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
+use tracing::instrument;
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
@@ -54,6 +55,7 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
+    #[instrument(skip(self, request), target = "tx-proxy::proxy")]
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
         let mut fanout = self.fanout.clone();
