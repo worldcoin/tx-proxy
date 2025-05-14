@@ -169,20 +169,17 @@ pub fn validate(secret: &JwtSecret, jwt: &str) -> Result<(), JwtError> {
     let validation = Validation::new(Algorithm::HS256);
     let bytes = secret.as_bytes();
 
-    match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
-        Ok(token) => {
-            if !token.claims.is_within_time_window() {
-                Err(JwtError::InvalidIssuanceTimestamp)?
-            }
-        }
-        Err(err) => match *err.kind() {
+    if let Err(err) =
+        jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation)
+    {
+        match *err.kind() {
             ErrorKind::InvalidSignature => Err(JwtError::InvalidSignature)?,
             ErrorKind::InvalidAlgorithm => Err(JwtError::UnsupportedSignatureAlgorithm)?,
             _ => {
                 let detail = format!("{err}");
                 Err(JwtError::JwtDecodingError(detail))?
             }
-        },
+        }
     };
 
     Ok(())
