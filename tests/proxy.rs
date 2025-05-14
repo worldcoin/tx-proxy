@@ -1,7 +1,3 @@
-use tx_proxy::client::HttpClient as TxProxyHttpClient;
-use tx_proxy::fanout::FanoutWrite;
-use tx_proxy::proxy::ProxyLayer;
-use tx_proxy::validation::ValidationLayer;
 use alloy_primitives::{Bytes, bytes, hex};
 use alloy_rpc_types_engine::JwtSecret;
 use eyre::Result;
@@ -23,6 +19,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::{net::TcpListener, task::JoinHandle};
+use tx_proxy::client::HttpClient as TxProxyHttpClient;
+use tx_proxy::fanout::FanoutWrite;
+use tx_proxy::proxy::ProxyLayer;
+use tx_proxy::validation::ValidationLayer;
 
 struct TestHarness {
     builder_0: MockHttpServer,
