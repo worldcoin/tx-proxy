@@ -1,14 +1,16 @@
 use crate::auth::{AuthLayer, JwtAuthValidator};
+use crate::proxy::ProxyLayer;
 use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
 use eyre::{Result, eyre};
 use http::{Request, Response, StatusCode};
+use http_body_util::Full;
 use hyper::Uri;
+use hyper::body::Bytes;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
-use jsonrpsee::http_client::HttpBody;
 use jsonrpsee::server::ServerHandle;
 use jsonrpsee::{RpcModule, server::Server};
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -41,6 +43,9 @@ pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
 pub struct Cli {
     #[clap(flatten)]
     pub builder_targets: BuilderTargets,
+
+    #[clap(flatten)]
+    pub l2_targets: L2Targets,
 
     /// JWT Secret for the RPC server
     #[clap(long, env, value_name = "HEX")]
@@ -99,12 +104,14 @@ impl Cli {
             .install_default()
             .expect("TLS Error: Failed to install default provider");
 
+        let (metrics_shutdown_sender, metrics_shutdown_receiver) = tokio::sync::oneshot::channel();
         self.init_tracing()?;
-        self.init_metrics()?;
+        self.init_metrics(metrics_shutdown_sender)?;
 
         let jwt_secret = self.jwt_secret()?;
         let handle = self.serve(jwt_secret).await?;
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
+
         tokio::select! {
             _ = handle.clone().stopped() => {
                 error!("Server stopped unexpectedly or crashed");
@@ -112,6 +119,11 @@ impl Cli {
             }
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
+                handle.stop()?;
+                Ok(())
+            }
+            _ = metrics_shutdown_receiver => {
+                error!("Metrics server shut down, shutting down...");
                 handle.stop()?;
                 Ok(())
             }
@@ -123,7 +135,7 @@ impl Cli {
         }
     }
 
-    fn init_metrics(&self) -> Result<()> {
+    fn init_metrics(&self, shutdown_sender: tokio::sync::oneshot::Sender<()>) -> Result<()> {
         if self.metrics {
             let recorder = PrometheusBuilder::new().build_recorder();
             let handle = recorder.handle();
@@ -132,11 +144,14 @@ impl Cli {
                 .push(PrefixLayer::new("tx-proxy"))
                 .install()?;
 
-            // Run the metrics server in a separate task
-            tokio::spawn(init_metrics_server(
-                SocketAddr::new(self.metrics_host, self.metrics_port),
-                handle,
-            ));
+            // Start the metrics server
+            let addr = SocketAddr::new(self.metrics_host, self.metrics_port);
+            tokio::spawn(async move {
+                if let Err(e) = init_metrics_server(addr, handle).await {
+                    error!(message = "Error starting metrics server", error = %e);
+                }
+                let _ = shutdown_sender.send(());
+            });
         }
 
         Ok(())
@@ -238,7 +253,8 @@ impl Cli {
             let middleware = tower::ServiceBuilder::new()
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?));
+                .layer(ValidationLayer::new(self.builder_targets.build()?))
+                .layer(ProxyLayer::new(self.l2_targets.build()?));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)
@@ -252,7 +268,9 @@ impl Cli {
         } else {
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?));
+                .layer(ValidationLayer::new(self.builder_targets.build()?))
+                .layer(ProxyLayer::new(self.l2_targets.build()?));
+
             let server = Server::builder()
                 .set_http_middleware(middleware)
                 .max_connections(self.max_concurrent_connections)
@@ -286,27 +304,28 @@ pub(crate) async fn init_metrics_server(
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {
-                let handle = handle.clone(); // Clone the handle for each connection
+                let handle = handle.clone();
                 tokio::task::spawn(async move {
                     let service = service_fn(move |_req: Request<hyper::body::Incoming>| {
                         let response = match _req.uri().path() {
                             "/metrics" => Response::builder()
                                 .header("content-type", "text/plain")
-                                .body(HttpBody::from(handle.render()))
+                                .body(Full::new(Bytes::from(handle.render())))
                                 .unwrap(),
                             _ => Response::builder()
                                 .status(StatusCode::NOT_FOUND)
-                                .body(HttpBody::empty())
+                                .body(Full::new(Bytes::new()))
                                 .unwrap(),
                         };
                         async { Ok::<_, hyper::Error>(response) }
                     });
 
                     let io = TokioIo::new(stream);
-
                     if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
                         error!(message = "Error serving metrics connection", error = %err);
                     }
+
+                    Ok::<_, hyper::Error>(())
                 });
             }
             Err(e) => {
@@ -322,17 +341,9 @@ macro_rules! define_rpc_args {
             paste! {
                 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
                 pub struct $name {
-                    /// RPC Server 0
+                    /// RPC URLs
                     #[arg(long, env)]
-                    pub [<$prefix _url_0>]: Uri,
-
-                    /// RPC Server 1
-                    #[arg(long, env)]
-                    pub [<$prefix _url_1>]: Uri,
-
-                    /// RPC Server 2
-                    #[arg(long, env)]
-                    pub [<$prefix _url_2>]: Uri,
+                    pub [<$prefix _urls>]: Vec<Uri>,
 
                     /// Hex encoded JWT secret to use for an authenticated RPC server.
                     #[arg(long, env, value_name = "HEX")]
@@ -362,10 +373,14 @@ macro_rules! define_rpc_args {
 
                     pub fn build(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
-                        let client_0 = HttpClient::new(self.[<$prefix _url_0>].clone(), jwt, self.[<$prefix _timeout>]);
-                        let client_1 = HttpClient::new(self.[<$prefix _url_1>].clone(), jwt, self.[<$prefix _timeout>]);
-                        let client_2 = HttpClient::new(self.[<$prefix _url_2>].clone(), jwt, self.[<$prefix _timeout>]);
-                        Ok(FanoutWrite::new(vec![client_0, client_1, client_2]))
+                        let backend = self.[<$prefix _urls>]
+                            .iter()
+                            .map(|url| {
+                                HttpClient::new(url.clone(), jwt, self.[<$prefix _timeout>])
+                            })
+                            .collect::<Vec<_>>();
+
+                        Ok(FanoutWrite::new(backend))
                     }
                 }
             }
@@ -373,4 +388,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!((BuilderTargets, builder));
+define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));

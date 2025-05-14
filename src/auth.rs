@@ -1,10 +1,11 @@
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, errors::ErrorKind};
 use pin_project::pin_project;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 
-use alloy_rpc_types_engine::{JwtError, JwtSecret};
+use alloy_rpc_types_engine::{Claims, JwtError, JwtSecret};
 use http::{HeaderMap, Response, StatusCode, header};
 use jsonrpsee::{
     http_client::{HttpBody, HttpResponse},
@@ -146,7 +147,7 @@ impl JwtAuthValidator {
 impl JwtAuthValidator {
     pub fn validate(&self, headers: &HeaderMap) -> Result<(), HttpResponse> {
         match get_bearer(headers) {
-            Some(jwt) => match self.secret.validate(&jwt) {
+            Some(jwt) => match validate(&self.secret, &jwt) {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     error!(target: "tx-proxy::jwt-validator", "Invalid JWT: {e}");
@@ -162,6 +163,26 @@ impl JwtAuthValidator {
             }
         }
     }
+}
+
+pub fn validate(secret: &JwtSecret, jwt: &str) -> Result<(), JwtError> {
+    let validation = Validation::new(Algorithm::HS256);
+    let bytes = secret.as_bytes();
+
+    if let Err(err) =
+        jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation)
+    {
+        match *err.kind() {
+            ErrorKind::InvalidSignature => Err(JwtError::InvalidSignature)?,
+            ErrorKind::InvalidAlgorithm => Err(JwtError::UnsupportedSignatureAlgorithm)?,
+            _ => {
+                let detail = format!("{err}");
+                Err(JwtError::JwtDecodingError(detail))?
+            }
+        }
+    };
+
+    Ok(())
 }
 
 /// This is an utility function that retrieves a bearer
@@ -210,7 +231,6 @@ mod tests {
         valid_jwt().await;
         missing_jwt_error().await;
         wrong_jwt_signature_error().await;
-        invalid_issuance_timestamp_error().await;
         jwt_decode_error().await
     }
 
@@ -244,22 +264,6 @@ mod tests {
 
         let (status, body) = send_request(Some(jwt)).await;
         let expected = JwtError::InvalidSignature;
-        assert_eq!(status, StatusCode::UNAUTHORIZED);
-        assert_eq!(body, expected.to_string());
-    }
-
-    async fn invalid_issuance_timestamp_error() {
-        let secret = JwtSecret::from_hex(SECRET).unwrap(); // Same secret as the server
-
-        let iat = to_u64(SystemTime::now()) + 1000;
-        let claims = Claims {
-            iat,
-            exp: Some(10000000000),
-        };
-        let jwt = secret.encode(&claims).unwrap();
-
-        let (status, body) = send_request(Some(jwt)).await;
-        let expected = JwtError::InvalidIssuanceTimestamp;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body, expected.to_string());
     }
