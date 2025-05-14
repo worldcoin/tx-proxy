@@ -377,10 +377,7 @@ async fn test_send_raw_transaction_with_forbidden_method() -> Result<()> {
         .request::<serde_json::Value, _>(expected_method, (expected_tx.clone(),))
         .await;
 
-    assert!(result.is_err()); // TODO: match on specific error instead
-
-    eprintln!("result: {:?}", result);
-    eprintln!("result.is_err(): {:?}", result.is_err());
+    assert!(result.is_err_and(|e| { e.to_string().eq("Request rejected `404`") }));
 
     Ok(())
 }
