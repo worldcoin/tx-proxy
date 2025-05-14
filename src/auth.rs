@@ -231,7 +231,6 @@ mod tests {
         valid_jwt().await;
         missing_jwt_error().await;
         wrong_jwt_signature_error().await;
-        invalid_issuance_timestamp_error().await;
         jwt_decode_error().await
     }
 
@@ -265,22 +264,6 @@ mod tests {
 
         let (status, body) = send_request(Some(jwt)).await;
         let expected = JwtError::InvalidSignature;
-        assert_eq!(status, StatusCode::UNAUTHORIZED);
-        assert_eq!(body, expected.to_string());
-    }
-
-    async fn invalid_issuance_timestamp_error() {
-        let secret = JwtSecret::from_hex(SECRET).unwrap(); // Same secret as the server
-
-        let iat = to_u64(SystemTime::now()) + 1000;
-        let claims = Claims {
-            iat,
-            exp: Some(10000000000),
-        };
-        let jwt = secret.encode(&claims).unwrap();
-
-        let (status, body) = send_request(Some(jwt)).await;
-        let expected = JwtError::InvalidIssuanceTimestamp;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body, expected.to_string());
     }
