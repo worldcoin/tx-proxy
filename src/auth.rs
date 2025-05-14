@@ -166,8 +166,6 @@ impl JwtAuthValidator {
 }
 
 pub fn validate(secret: &JwtSecret, jwt: &str) -> Result<(), JwtError> {
-    // Create a new validation object with the required signature algorithm
-    // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
     let validation = Validation::new(Algorithm::HS256);
     let bytes = secret.as_bytes();
 
