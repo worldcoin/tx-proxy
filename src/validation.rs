@@ -6,11 +6,18 @@ use std::{
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
+    types::ErrorObject,
 };
 use tower::{Layer, Service};
 use tracing::{debug, instrument};
 
 use crate::{fanout::FanoutWrite, rpc::RpcRequest};
+
+pub const ALLOWED_METHODS: &[&str; 3] = &[
+    "eth_sendRawTransaction",
+    "eth_sendRawTransactionConditional",
+    "eth_chainId",
+];
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ValidationLayer {
@@ -64,6 +71,10 @@ where
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
+            if !ALLOWED_METHODS.contains(&&rpc_request.method[..]) {
+                return Ok::<HttpResponse<HttpBody>, BoxError>(invalid_method_response());
+            }
+
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
 
             let mut responses = fanout.fan_request(rpc_request.clone()).await?;
@@ -96,4 +107,14 @@ where
 
         Box::pin(fut)
     }
+}
+
+fn invalid_method_response() -> HttpResponse {
+    HttpResponse::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(HttpBody::from(
+            ErrorObject::owned(-32601, "Method not found", None::<()>).to_string(),
+        ))
+        .unwrap()
 }
