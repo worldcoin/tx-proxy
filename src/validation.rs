@@ -13,10 +13,9 @@ use tracing::{debug, instrument};
 
 use crate::{fanout::FanoutWrite, rpc::RpcRequest};
 
-pub const ALLOWED_METHODS: &[&str; 3] = &[
-    "eth_sendRawTransaction",
-    "eth_sendRawTransactionConditional",
-    "eth_chainId",
+pub const ALLOWED_METHODS: &[&str; 2] = &[
+    "eth_",
+    "net_peerCount",
 ];
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
