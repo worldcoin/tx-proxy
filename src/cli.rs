@@ -22,21 +22,30 @@ use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use paste::paste;
 use rollup_boost::{HealthLayer, LogFormat};
+use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
-use tracing::Level;
 use tracing::level_filters::LevelFilter;
+use tracing::{Level, Metadata};
 use tracing::{error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Targets;
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 
 pub const DEFAULT_HTTP_PORT: u16 = 8545;
 pub const DEFAULT_METRICS_PORT: u16 = 9090;
 pub const DEFAULT_OTLP_URL: &str = "http://localhost:4317";
+
+struct TraceFilter;
+
+impl<S> Filter<S> for TraceFilter {
+    fn enabled(&self, meta: &Metadata<'_>, _: &Context<'_, S>) -> bool {
+        meta.target() == "tx-proxy"
+    }
+}
 
 #[derive(clap::Parser)]
 #[clap(about, version, author)]
@@ -90,6 +99,10 @@ pub struct Cli {
     /// Log format
     #[arg(long, env, default_value = "text")]
     pub log_format: LogFormat,
+
+    /// Directory to write logs to
+    #[arg(long, env)]
+    pub log_dir: Option<PathBuf>,
 
     /// Maximum number of concurrent connections to allow.
     ///
@@ -201,47 +214,123 @@ impl Cli {
 
             match self.log_format {
                 LogFormat::Json => {
-                    tracing::subscriber::set_global_default(
-                        registry.with(
-                            tracing_subscriber::fmt::layer()
-                                .json()
-                                .with_ansi(false)
-                                .with_filter(log_filter.clone()),
-                        ),
-                    )?;
+                    if let Some(log_dir) = &self.log_dir {
+                        tracing::subscriber::set_global_default(
+                            registry
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .json()
+                                        .with_ansi(false)
+                                        .with_filter(log_filter.clone()),
+                                )
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .json()
+                                        .with_writer(fs::File::create(
+                                            log_dir.join("tx-proxy.log"),
+                                        )?)
+                                        .with_filter(TraceFilter),
+                                ),
+                        )?
+                    } else {
+                        tracing::subscriber::set_global_default(
+                            registry.with(
+                                tracing_subscriber::fmt::layer()
+                                    .json()
+                                    .with_ansi(false)
+                                    .with_filter(log_filter.clone()),
+                            ),
+                        )?
+                    }
                 }
                 LogFormat::Text => {
-                    tracing::subscriber::set_global_default(
-                        registry.with(
-                            tracing_subscriber::fmt::layer()
-                                .with_ansi(false)
-                                .with_filter(log_filter.clone()),
-                        ),
-                    )?;
+                    if let Some(log_dir) = &self.log_dir {
+                        tracing::subscriber::set_global_default(
+                            registry
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .with_ansi(false)
+                                        .with_filter(log_filter.clone()),
+                                )
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .with_writer(fs::File::create(
+                                            log_dir.join("tx-proxy.log"),
+                                        )?)
+                                        .with_filter(TraceFilter),
+                                ),
+                        )?
+                    } else {
+                        tracing::subscriber::set_global_default(
+                            registry.with(
+                                tracing_subscriber::fmt::layer()
+                                    .with_ansi(false)
+                                    .with_filter(log_filter.clone()),
+                            ),
+                        )?
+                    }
                 }
-            }
+            };
         } else {
             match self.log_format {
                 LogFormat::Json => {
-                    tracing::subscriber::set_global_default(
-                        registry.with(
-                            tracing_subscriber::fmt::layer()
-                                .json()
-                                .with_ansi(false)
-                                .with_filter(log_filter.clone()),
-                        ),
-                    )?;
+                    if let Some(log_dir) = &self.log_dir {
+                        tracing::subscriber::set_global_default(
+                            registry
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .json()
+                                        .with_ansi(false)
+                                        .with_filter(log_filter.clone()),
+                                )
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .json()
+                                        .with_writer(fs::File::create(
+                                            log_dir.join("tx-proxy.log"),
+                                        )?)
+                                        .with_filter(TraceFilter),
+                                ),
+                        )?
+                    } else {
+                        tracing::subscriber::set_global_default(
+                            registry.with(
+                                tracing_subscriber::fmt::layer()
+                                    .json()
+                                    .with_ansi(false)
+                                    .with_filter(log_filter.clone()),
+                            ),
+                        )?
+                    }
                 }
                 LogFormat::Text => {
-                    tracing::subscriber::set_global_default(
-                        registry.with(
-                            tracing_subscriber::fmt::layer()
-                                .with_ansi(false)
-                                .with_filter(log_filter.clone()),
-                        ),
-                    )?;
+                    if let Some(log_dir) = &self.log_dir {
+                        tracing::subscriber::set_global_default(
+                            registry
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .with_ansi(false)
+                                        .with_filter(log_filter.clone()),
+                                )
+                                .with(
+                                    tracing_subscriber::fmt::layer()
+                                        .with_writer(fs::File::create(
+                                            log_dir.join("tx-proxy.log"),
+                                        )?)
+                                        .with_filter(TraceFilter),
+                                ),
+                        )?
+                    } else {
+                        tracing::subscriber::set_global_default(
+                            registry.with(
+                                tracing_subscriber::fmt::layer()
+                                    .with_ansi(false)
+                                    .with_filter(log_filter.clone()),
+                            ),
+                        )?
+                    }
                 }
-            }
+            };
         }
 
         Ok(())
