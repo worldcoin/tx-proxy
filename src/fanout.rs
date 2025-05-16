@@ -30,15 +30,16 @@ impl FanoutWrite {
             .collect::<Vec<_>>();
 
         let results = join_all(fut).await;
-        let mut responses = Vec::with_capacity(results.len());
-        for res in results {
-            match res {
-                Ok(response) => responses.push(response),
+        let responses = results
+            .into_iter()
+            .filter_map(|res| match res {
+                Ok(resp) => Some(resp),
                 Err(err) => {
-                    error!(%err, "Error forwarding request");
+                    error!(%err, "Request failed");
+                    None
                 }
-            }
-        }
+            })
+            .collect::<Vec<_>>();
 
         if responses.is_empty() {
             return Err(eyre!("All requests failed. No valid responses received.").into());
