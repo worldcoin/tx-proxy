@@ -219,7 +219,7 @@ impl MockHttpServer {
                 "result": format!("{}", bytes!("1234")),
                 "id": request_body["id"]
             }),
-            "eth_sendRawTransactionValidationFail" => {
+            "bad_method" => {
                 let error_response = json!({
                     "jsonrpc": "2.0",
                     "error": { "code": INTERNAL_ERROR_CODE, "message": "PBH Transaction Validation Failed" },
@@ -358,7 +358,7 @@ async fn test_send_raw_transaction_sad_path() -> Result<()> {
         assert_eq!(l2_requests.len(), 0);
     };
 
-    send_request("eth_sendRawTransactionValidationFail").await;
+    send_request("bad_method").await;
     assert_validation_fail_case(&test_harness, 0).await;
 
     Ok(())
