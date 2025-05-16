@@ -40,7 +40,7 @@ impl FanoutWrite {
             }
         }
 
-        if responses.is_empty() {            
+        if responses.is_empty() {
             return Err(eyre!("All requests failed. No valid responses received.").into());
         }
 
