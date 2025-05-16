@@ -67,7 +67,10 @@ where
 
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
-            if !ALLOWED_METHODS.contains(&&rpc_request.method[..]) {
+            if !ALLOWED_METHODS
+                .iter()
+                .any(|m| rpc_request.method.contains(m))
+            {
                 return Ok::<HttpResponse<HttpBody>, BoxError>(invalid_method_response());
             }
 
