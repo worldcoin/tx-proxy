@@ -43,7 +43,7 @@ struct TraceFilter;
 
 impl<S> Filter<S> for TraceFilter {
     fn enabled(&self, meta: &Metadata<'_>, _: &Context<'_, S>) -> bool {
-        meta.target() == "tx-proxy"
+        meta.target().starts_with("tx-proxy")
     }
 }
 
