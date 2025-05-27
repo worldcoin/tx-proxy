@@ -74,11 +74,8 @@ where
                 return Ok::<HttpResponse<HttpBody>, BoxError>(invalid_method_response());
             }
 
-            debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
-
             let mut responses = fanout.fan_request(rpc_request.clone()).await?;
             if responses.iter().all(|res| !res.pbh_error()) {
-                debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");
                 tokio::spawn(async move {
                     let _ = service.inner.call(rpc_request.into()).await;
                 });
