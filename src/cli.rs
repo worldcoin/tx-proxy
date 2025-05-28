@@ -1,4 +1,5 @@
 use crate::auth::{AuthLayer, JwtAuthValidator};
+use crate::metrics::ProxyMetrics;
 use crate::proxy::ProxyLayer;
 use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
 use alloy_rpc_types_engine::JwtSecret;
@@ -25,6 +26,7 @@ use rollup_boost::{HealthLayer, LogFormat};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
 use tracing::level_filters::LevelFilter;
@@ -119,10 +121,10 @@ impl Cli {
 
         let (metrics_shutdown_sender, metrics_shutdown_receiver) = tokio::sync::oneshot::channel();
         self.init_tracing()?;
-        self.init_metrics(metrics_shutdown_sender)?;
+        let metrics = self.init_metrics(metrics_shutdown_sender)?;
 
         let jwt_secret = self.jwt_secret()?;
-        let handle = self.serve(jwt_secret).await?;
+        let handle = self.serve(jwt_secret, metrics).await?;
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
 
         tokio::select! {
@@ -148,7 +150,10 @@ impl Cli {
         }
     }
 
-    fn init_metrics(&self, shutdown_sender: tokio::sync::oneshot::Sender<()>) -> Result<()> {
+    fn init_metrics(
+        &self,
+        shutdown_sender: tokio::sync::oneshot::Sender<()>,
+    ) -> Result<Arc<ProxyMetrics>> {
         if self.metrics {
             let recorder = PrometheusBuilder::new().build_recorder();
             let handle = recorder.handle();
@@ -167,7 +172,7 @@ impl Cli {
             });
         }
 
-        Ok(())
+        Ok(Arc::new(ProxyMetrics::new()))
     }
 
     fn init_tracing(&self) -> Result<()> {
@@ -336,14 +341,21 @@ impl Cli {
         Ok(())
     }
 
-    async fn serve(&self, jwt_secret: Option<JwtSecret>) -> Result<ServerHandle> {
+    async fn serve(
+        &self,
+        jwt_secret: Option<JwtSecret>,
+        metrics: Arc<ProxyMetrics>,
+    ) -> Result<ServerHandle> {
         let module = RpcModule::new(());
         if let Some(secret) = jwt_secret {
             let middleware = tower::ServiceBuilder::new()
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?))
-                .layer(ProxyLayer::new(self.l2_targets.build()?));
+                .layer(ValidationLayer::new(
+                    self.builder_targets.build()?,
+                    metrics.clone(),
+                ))
+                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)
@@ -357,8 +369,11 @@ impl Cli {
         } else {
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
-                .layer(ValidationLayer::new(self.builder_targets.build()?))
-                .layer(ProxyLayer::new(self.l2_targets.build()?));
+                .layer(ValidationLayer::new(
+                    self.builder_targets.build()?,
+                    metrics.clone(),
+                ))
+                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)

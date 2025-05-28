@@ -96,8 +96,11 @@ impl TestHarness {
 
         let middleware = tower::ServiceBuilder::new()
             .layer(HealthLayer)
-            .layer(ValidationLayer::new(builder_fanout))
-            .layer(ProxyLayer::new(l2_fanout));
+            .layer(ValidationLayer::new(
+                builder_fanout,
+                Arc::new(Default::default()),
+            ))
+            .layer(ProxyLayer::new(l2_fanout, Arc::new(Default::default())));
         let temp_listener = TcpListener::bind("0.0.0.0:0").await?;
         let server_addr = temp_listener.local_addr()?;
 
