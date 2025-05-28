@@ -1,9 +1,11 @@
-use crate::fanout::FanoutWrite;
 use crate::rpc::RpcRequest;
+use crate::{fanout::FanoutWrite, metrics::ProxyMetrics};
 use jsonrpsee::{
     core::BoxError,
     http_client::{HttpBody, HttpRequest, HttpResponse},
 };
+use std::sync::Arc;
+use std::time::Instant;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -14,12 +16,13 @@ use tracing::instrument;
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ProxyLayer {
     pub fanout: FanoutWrite,
+    pub metrics: Arc<ProxyMetrics>,
 }
 
 impl ProxyLayer {
     /// Creates a new [`ProxyLayer`] with the given fanout.
-    pub fn new(fanout: FanoutWrite) -> Self {
-        Self { fanout }
+    pub fn new(fanout: FanoutWrite, metrics: Arc<ProxyMetrics>) -> Self {
+        Self { fanout, metrics }
     }
 }
 
@@ -28,6 +31,7 @@ impl<S> Layer<S> for ProxyLayer {
     fn layer(&self, inner: S) -> Self::Service {
         ProxyService {
             fanout: self.fanout.clone(),
+            metrics: self.metrics.clone(),
             inner,
         }
     }
@@ -36,6 +40,7 @@ impl<S> Layer<S> for ProxyLayer {
 #[derive(Clone)]
 pub struct ProxyService<S> {
     fanout: FanoutWrite,
+    metrics: Arc<ProxyMetrics>,
     inner: S,
 }
 
@@ -59,11 +64,14 @@ where
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
         let mut fanout = self.fanout.clone();
+        let metrics = self.metrics.clone();
         service.inner = std::mem::replace(&mut self.inner, service.inner);
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
+            let now = Instant::now();
             let mut result = fanout.fan_request(rpc_request.clone()).await?;
-
+            metrics.record_l2_latency(now.elapsed().as_secs_f64());
+            metrics.record_l2_failed_request(fanout.targets.len() as f64 - result.len() as f64);
             Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
         };
 

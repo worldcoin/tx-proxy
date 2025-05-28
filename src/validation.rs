@@ -1,6 +1,8 @@
 use std::{
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
+    time::Instant,
 };
 
 use jsonrpsee::{
@@ -11,19 +13,20 @@ use jsonrpsee::{
 use tower::{Layer, Service};
 use tracing::{debug, instrument};
 
-use crate::{fanout::FanoutWrite, rpc::RpcRequest};
+use crate::{fanout::FanoutWrite, metrics::ProxyMetrics, rpc::RpcRequest};
 
 pub const ALLOWED_METHODS: &[&str; 2] = &["eth_", "net_peerCount"];
 
 /// A [`Layer`] that validates responses from one fanout prior to forwarding them to the next fanout.
 pub struct ValidationLayer {
     pub fanout: FanoutWrite,
+    pub metrics: Arc<ProxyMetrics>,
 }
 
 impl ValidationLayer {
     /// Creates a new [`ValidationLayer`] with the given fanout.
-    pub fn new(fanout: FanoutWrite) -> Self {
-        Self { fanout }
+    pub fn new(fanout: FanoutWrite, metrics: Arc<ProxyMetrics>) -> Self {
+        Self { fanout, metrics }
     }
 }
 
@@ -32,6 +35,7 @@ impl<S> Layer<S> for ValidationLayer {
     fn layer(&self, inner: S) -> Self::Service {
         ValidationService {
             fanout: self.fanout.clone(),
+            metrics: self.metrics.clone(),
             inner,
         }
     }
@@ -40,6 +44,7 @@ impl<S> Layer<S> for ValidationLayer {
 #[derive(Clone)]
 pub struct ValidationService<S> {
     fanout: FanoutWrite,
+    metrics: Arc<ProxyMetrics>,
     inner: S,
 }
 
@@ -63,6 +68,7 @@ where
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
         let mut service = self.clone();
         let mut fanout = self.fanout.clone();
+        let metrics = self.metrics.clone();
         service.inner = std::mem::replace(&mut self.inner, service.inner);
 
         let fut = async move {
@@ -75,8 +81,12 @@ where
             }
 
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
-
+            let now = Instant::now();
             let mut responses = fanout.fan_request(rpc_request.clone()).await?;
+            metrics.record_builder_latency(now.elapsed().as_secs_f64());
+            metrics.record_builder_failed_request(
+                fanout.targets.len() as f64 - responses.len() as f64,
+            );
             if responses.iter().all(|res| !res.pbh_error()) {
                 debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");
                 tokio::spawn(async move {
