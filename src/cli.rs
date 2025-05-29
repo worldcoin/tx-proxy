@@ -131,17 +131,17 @@ impl Cli {
             _ = handle.clone().stopped() => {
                 error!("Server stopped unexpectedly or crashed");
                 Err(eyre::eyre!("Server stopped unexpectedly or crashed"))
-            }
+            },
             _ = tokio::signal::ctrl_c() => {
                 error!("Received Ctrl-C, shutting down...");
                 handle.stop()?;
                 Ok(())
-            }
-            _ = metrics_shutdown_receiver => {
+            },
+            _ = metrics_shutdown_receiver, if self.metrics => {
                 error!("Metrics server shut down, shutting down...");
                 handle.stop()?;
                 Ok(())
-            }
+            },
             _ = sigterm.recv() => {
                 error!("Received SIGTERM, shutting down...");
                 handle.stop()?;
