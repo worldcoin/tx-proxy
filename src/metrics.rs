@@ -1,4 +1,4 @@
-use metrics::{Histogram, histogram};
+use metrics::{Counter, Histogram, counter, histogram};
 use metrics_derive::Metrics;
 
 #[derive(Metrics)]
@@ -16,6 +16,9 @@ pub struct ProxyMetrics {
     /// Builder Failed Requests
     #[metric(describe = "Builder Failed Requests")]
     pub builder_failed_requests: Histogram,
+    /// Inbound Requests
+    #[metric(describe = "Inbound Requests")]
+    pub inbound_requests: Counter,
 }
 
 impl ProxyMetrics {
@@ -26,6 +29,7 @@ impl ProxyMetrics {
             builder_requests_latency: histogram!("builder_requests_latency"),
             l2_failed_requests: histogram!("l2_failed_requests"),
             builder_failed_requests: histogram!("builder_failed_requests"),
+            inbound_requests: counter!("inbound_requests"),
         }
     }
 
@@ -47,5 +51,10 @@ impl ProxyMetrics {
     /// Records a failed request to the builder.
     pub fn record_builder_failed_request(&self, duration: f64) {
         self.builder_failed_requests.record(duration);
+    }
+
+    /// Records an inbound request.
+    pub fn record_inbound_request(&self, value: u64) {
+        self.inbound_requests.increment(value);
     }
 }

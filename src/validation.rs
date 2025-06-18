@@ -66,6 +66,7 @@ where
 
     #[instrument(skip(self, request), target = "tx-proxy::validation")]
     fn call(&mut self, request: HttpRequest<HttpBody>) -> Self::Future {
+        self.metrics.record_inbound_request(1);
         let mut service = self.clone();
         let mut fanout = self.fanout.clone();
         let metrics = self.metrics.clone();
