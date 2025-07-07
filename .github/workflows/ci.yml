@@ -62,6 +62,8 @@ jobs:
         uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly
+      - name: Install latest nextest release
+        uses: taiki-e/install-action@nextest
       - name: Build tests
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
         with:
