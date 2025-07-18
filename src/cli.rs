@@ -1,3 +1,4 @@
+use crate::any_or_value::AnyOr;
 use crate::auth::{AuthLayer, JwtAuthValidator};
 use crate::metrics::ProxyMetrics;
 use crate::proxy::ProxyLayer;
@@ -6,7 +7,7 @@ use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
 use eyre::{Result, eyre};
-use http::{Request, Response, StatusCode};
+use http::{HeaderName, HeaderValue, Method, Request, Response, StatusCode};
 use http_body_util::Full;
 use hyper::Uri;
 use hyper::body::Bytes;
@@ -29,6 +30,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::level_filters::LevelFilter;
 use tracing::{Level, Metadata};
 use tracing::{error, info};
@@ -73,6 +75,24 @@ pub struct Cli {
     /// The port to bind the HTTP server to.
     #[clap(long, env, default_value_t = DEFAULT_HTTP_PORT)]
     pub http_port: u16,
+
+    /// The allowed CORS origins.
+    ///
+    /// Can be specific values or a '*' wildcard
+    #[clap(long = "cors.allow-origin")]
+    pub cors_allow_origin: Vec<AnyOr<HeaderValue>>,
+
+    /// The allowed CORS methods.
+    ///
+    /// Can be specific values or a '*' wildcard
+    #[clap(long = "cors.allow-methods")]
+    pub cors_allow_methods: Vec<AnyOr<Method>>,
+
+    /// The allowed CORS headers
+    ///
+    /// Can be specific values or a '*' wildcard
+    #[clap(long = "cors.allow-headers")]
+    pub cors_allow_headers: Vec<AnyOr<HeaderName>>,
 
     /// Enable Prometheus metrics
     #[arg(long, env, default_value = "false")]
@@ -347,6 +367,22 @@ impl Cli {
         metrics: Arc<ProxyMetrics>,
     ) -> Result<ServerHandle> {
         let module = RpcModule::new(());
+
+        let mut cors = CorsLayer::new();
+
+        match AnyOr::coalesce(&self.cors_allow_origin) {
+            AnyOr::Any => cors = cors.allow_origin(Any),
+            AnyOr::Specific(origins) => cors = cors.allow_origin(origins),
+        }
+        match AnyOr::coalesce(&self.cors_allow_methods) {
+            AnyOr::Any => cors = cors.allow_methods(Any),
+            AnyOr::Specific(methods) => cors = cors.allow_methods(methods),
+        }
+        match AnyOr::coalesce(&self.cors_allow_headers) {
+            AnyOr::Any => cors = cors.allow_headers(Any),
+            AnyOr::Specific(headers) => cors = cors.allow_headers(headers),
+        }
+
         if let Some(secret) = jwt_secret {
             let middleware = tower::ServiceBuilder::new()
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
@@ -355,6 +391,7 @@ impl Cli {
                     self.builder_targets.build()?,
                     metrics.clone(),
                 ))
+                .layer(cors)
                 .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
@@ -373,6 +410,7 @@ impl Cli {
                     self.builder_targets.build()?,
                     metrics.clone(),
                 ))
+                .layer(cors)
                 .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
