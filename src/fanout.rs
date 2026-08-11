@@ -36,7 +36,7 @@ impl FanoutWrite {
         for (client, result) in self.targets.iter().zip(results) {
             match result {
                 Ok(response) => responses.push(response),
-                Err(error) => failures.push((client.url.to_string(), error.to_string())),
+                Err(error) => failures.push((client.log_target(), error.to_string())),
             }
         }
 

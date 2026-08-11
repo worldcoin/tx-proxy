@@ -25,7 +25,15 @@ pub type HttpClientService =
 #[derive(Clone, Debug)]
 pub struct HttpClient {
     client: HttpClientService,
-    pub(crate) url: Uri,
+    url: Uri,
+}
+
+fn sanitized_target(url: &Uri) -> String {
+    match (url.host(), url.port_u16()) {
+        (Some(host), Some(port)) => format!("{host}:{port}"),
+        (Some(host), None) => host.to_owned(),
+        (None, _) => "<unknown>".to_owned(),
+    }
 }
 
 impl HttpClient {
@@ -48,6 +56,11 @@ impl HttpClient {
         Self { client, url }
     }
 
+    /// Returns a credential-safe target identifier for logs.
+    pub(crate) fn log_target(&self) -> String {
+        sanitized_target(&self.url)
+    }
+
     #[instrument(
         skip(self, req),
         target = "tx-proxy::http::forward",
@@ -65,5 +78,23 @@ impl HttpClient {
         let payload = parse_response_payload(&body_bytes)?;
         let response = http::Response::from_parts(parts, HttpBody::from(body_bytes));
         Ok(RpcResponse::new(response, payload))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitized_target_omits_credentials() {
+        let url: Uri = "https://provider.example:8545/v3/API_KEY?token=secret"
+            .parse()
+            .unwrap();
+        assert_eq!(sanitized_target(&url), "provider.example:8545");
+
+        let url: Uri = "https://user:password@provider.example:8545/v3/API_KEY"
+            .parse()
+            .unwrap();
+        assert_eq!(sanitized_target(&url), "provider.example:8545");
     }
 }
