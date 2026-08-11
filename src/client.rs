@@ -25,7 +25,7 @@ pub type HttpClientService =
 #[derive(Clone, Debug)]
 pub struct HttpClient {
     client: HttpClientService,
-    url: Uri,
+    pub(crate) url: Uri,
 }
 
 impl HttpClient {
@@ -51,8 +51,7 @@ impl HttpClient {
     #[instrument(
         skip(self, req),
         target = "tx-proxy::http::forward",
-        fields(otel.kind = ?SpanKind::Client),
-        err(Debug)
+        fields(otel.kind = ?SpanKind::Client)
     )]
     pub async fn forward(&mut self, req: RpcRequest) -> Result<RpcResponse<HttpBody>, BoxError> {
         debug!("forwarding {}", req.method);

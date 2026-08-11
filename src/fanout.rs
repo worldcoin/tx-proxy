@@ -3,7 +3,7 @@ use crate::rpc::{RpcRequest, RpcResponse};
 use eyre::eyre;
 use futures::future::join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-use tracing::error;
+use tracing::{error, warn};
 
 /// A FanoutWrite for fanning JSON-RPC requests to multiple
 /// Clients in a High Availability configuration.
@@ -30,19 +30,28 @@ impl FanoutWrite {
             .collect::<Vec<_>>();
 
         let results = join_all(fut).await;
-        let responses = results
-            .into_iter()
-            .filter_map(|res| match res {
-                Ok(resp) => Some(resp),
-                Err(err) => {
-                    error!(%err, "Request failed");
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut responses = Vec::with_capacity(results.len());
+        let mut failures = Vec::new();
+
+        for (client, result) in self.targets.iter().zip(results) {
+            match result {
+                Ok(response) => responses.push(response),
+                Err(error) => failures.push((client.url.to_string(), error.to_string())),
+            }
+        }
 
         if responses.is_empty() {
+            error!(failures = ?failures, "All requests failed");
             return Err(eyre!("All requests failed. No valid responses received.").into());
+        }
+
+        if !failures.is_empty() {
+            warn!(
+                successful_requests = responses.len(),
+                failed_requests = failures.len(),
+                failures = ?failures,
+                "Some requests failed"
+            );
         }
 
         Ok(responses)
