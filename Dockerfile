@@ -1,6 +1,6 @@
 FROM rust:1.85.1 AS base
 
-RUN cargo install sccache --version ^0.9
+RUN cargo install sccache --version ^0.9 --locked
 RUN cargo install cargo-chef --version ^0.1
 
 ENV CARGO_HOME=/usr/local/cargo
@@ -47,7 +47,7 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y netcat-traditional ca-certificates && \
+    apt-get install -y netcat-traditional ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 ARG TX_PROXY_BIN="tx-proxy"
