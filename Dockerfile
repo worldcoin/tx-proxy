@@ -1,7 +1,7 @@
-FROM rust:1.85.1 AS base
+FROM rust:1.88.0 AS base
 
 RUN cargo install sccache --version ^0.9 --locked
-RUN cargo install cargo-chef --version ^0.1
+RUN cargo install cargo-chef --version ^0.1 --locked
 
 ENV CARGO_HOME=/usr/local/cargo
 ENV RUSTC_WRAPPER=sccache
