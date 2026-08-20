@@ -85,9 +85,6 @@ where
             let now = Instant::now();
             let mut responses = fanout.fan_request(rpc_request.clone()).await?;
             metrics.record_builder_latency(now.elapsed().as_secs_f64());
-            metrics.record_builder_failed_request(
-                fanout.targets.len() as f64 - responses.len() as f64,
-            );
             if responses.iter().all(|res| !res.pbh_error()) {
                 debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");
                 tokio::spawn(async move {

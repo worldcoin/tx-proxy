@@ -71,7 +71,6 @@ where
             let now = Instant::now();
             let mut result = fanout.fan_request(rpc_request.clone()).await?;
             metrics.record_l2_latency(now.elapsed().as_secs_f64());
-            metrics.record_l2_failed_request(fanout.targets.len() as f64 - result.len() as f64);
             Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
         };
 

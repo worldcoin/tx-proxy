@@ -1,7 +1,11 @@
 use crate::auth::{AuthLayer, JwtAuthValidator};
 use crate::metrics::ProxyMetrics;
 use crate::proxy::ProxyLayer;
-use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
+use crate::{
+    client::HttpClient,
+    fanout::{FanoutKind, FanoutWrite},
+    validation::ValidationLayer,
+};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
@@ -440,7 +444,7 @@ pub(crate) async fn init_metrics_server(
 }
 
 macro_rules! define_rpc_args {
-    ($(($name:ident, $prefix:ident)),*) => {
+    ($(($name:ident, $prefix:ident, $kind:ident)),*) => {
         $(
             paste! {
                 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
@@ -484,7 +488,7 @@ macro_rules! define_rpc_args {
                             })
                             .collect::<Vec<_>>();
 
-                        Ok(FanoutWrite::new(backend))
+                        Ok(FanoutWrite::new(backend, FanoutKind::$kind))
                     }
                 }
             }
@@ -492,4 +496,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
+define_rpc_args!((BuilderTargets, builder, Builder), (L2Targets, l2, L2));
