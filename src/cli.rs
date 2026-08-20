@@ -176,6 +176,7 @@ impl Cli {
             });
         }
 
+        ProxyMetrics::describe_fanout_metrics();
         Ok(Arc::new(ProxyMetrics::default()))
     }
 
