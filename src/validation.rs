@@ -83,7 +83,7 @@ where
 
             debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to builder fanout");
             let now = Instant::now();
-            let mut responses = fanout.fan_request(rpc_request.clone()).await?;
+            let mut responses = fanout.fan_request(rpc_request.clone(), &metrics).await?;
             metrics.record_builder_latency(now.elapsed().as_secs_f64());
             if responses.iter().all(|res| !res.pbh_error()) {
                 debug!(target: "tx-proxy::validation", method = %rpc_request.method, "forwarding request to l2 fanout");

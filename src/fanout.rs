@@ -1,9 +1,9 @@
 use crate::client::HttpClient;
+use crate::metrics::ProxyMetrics;
 use crate::rpc::{RpcRequest, RpcResponse};
 use eyre::eyre;
 use futures::future::join_all;
 use jsonrpsee::{core::BoxError, http_client::HttpBody};
-use metrics::{counter, gauge};
 use tracing::{error, warn};
 
 #[derive(Clone, Copy, Debug)]
@@ -13,7 +13,7 @@ pub enum FanoutKind {
 }
 
 impl FanoutKind {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Builder => "builder",
             Self::L2 => "l2",
@@ -39,6 +39,7 @@ impl FanoutWrite {
     pub async fn fan_request(
         &mut self,
         req: RpcRequest,
+        metrics: &ProxyMetrics,
     ) -> Result<Vec<RpcResponse<HttpBody>>, BoxError> {
         let fut = self
             .targets
@@ -52,7 +53,7 @@ impl FanoutWrite {
 
         for (client, result) in self.targets.iter().zip(results) {
             let target = client.log_target();
-            self.record_target_health(&target, result.is_ok());
+            metrics.record_fanout_target_health(self.kind, &target, result.is_ok());
 
             match result {
                 Ok(response) => responses.push(response),
@@ -61,7 +62,7 @@ impl FanoutWrite {
         }
 
         if responses.is_empty() {
-            self.record_total_failure();
+            metrics.record_fanout_total_failure(self.kind);
             error!(failures = ?failures, "All requests failed");
             return Err(eyre!("All requests failed. No valid responses received.").into());
         }
@@ -77,23 +78,6 @@ impl FanoutWrite {
 
         Ok(responses)
     }
-
-    fn record_total_failure(&self) {
-        counter!(
-            "fanout_total_failures",
-            "fanout" => self.kind.as_str(),
-        )
-        .increment(1);
-    }
-
-    fn record_target_health(&self, target: &str, healthy: bool) {
-        gauge!(
-            "fanout_target_healthy",
-            "fanout" => self.kind.as_str(),
-            "target" => target.to_owned(),
-        )
-        .set(if healthy { 1.0 } else { 0.0 });
-    }
 }
 
 #[cfg(test)]
@@ -106,7 +90,6 @@ mod tests {
     fn total_failure_is_recorded_before_returning_an_error() {
         let recorder = DebuggingRecorder::new();
         let snapshotter = recorder.snapshotter();
-        let mut fanout = FanoutWrite::new(Vec::new(), FanoutKind::L2);
         let request = RpcRequest {
             parts: http::Request::new(()).into_parts().0,
             body: Vec::new(),
@@ -114,7 +97,9 @@ mod tests {
         };
 
         let result = with_local_recorder(&recorder, || {
-            futures::executor::block_on(fanout.fan_request(request))
+            let mut fanout = FanoutWrite::new(Vec::new(), FanoutKind::L2);
+            let metrics = ProxyMetrics::default();
+            futures::executor::block_on(fanout.fan_request(request, &metrics))
         });
         assert!(result.is_err());
 
@@ -134,10 +119,14 @@ mod tests {
     fn target_health_is_labeled_with_safe_target_and_kind() {
         let recorder = DebuggingRecorder::new();
         let snapshotter = recorder.snapshotter();
-        let fanout = FanoutWrite::new(Vec::new(), FanoutKind::Builder);
 
         with_local_recorder(&recorder, || {
-            fanout.record_target_health("builder.internal:8545", false);
+            let metrics = ProxyMetrics::default();
+            metrics.record_fanout_target_health(
+                FanoutKind::Builder,
+                "builder.internal:8545",
+                false,
+            );
         });
 
         let metrics = snapshotter.snapshot().into_vec();

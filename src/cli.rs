@@ -176,7 +176,7 @@ impl Cli {
             });
         }
 
-        Ok(Arc::new(ProxyMetrics::new()))
+        Ok(Arc::new(ProxyMetrics::default()))
     }
 
     fn init_tracing(&self) -> Result<()> {

@@ -69,7 +69,7 @@ where
         let fut = async move {
             let rpc_request = RpcRequest::from_request(request).await?;
             let now = Instant::now();
-            let mut result = fanout.fan_request(rpc_request.clone()).await?;
+            let mut result = fanout.fan_request(rpc_request.clone(), &metrics).await?;
             metrics.record_l2_latency(now.elapsed().as_secs_f64());
             Ok::<HttpResponse<HttpBody>, BoxError>(result.remove(0).response)
         };
