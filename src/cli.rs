@@ -356,10 +356,13 @@ impl Cli {
                 .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
                 .layer(HealthLayer)
                 .layer(ValidationLayer::new(
-                    self.builder_targets.build()?,
+                    self.builder_targets.build(FanoutKind::Builder)?,
                     metrics.clone(),
                 ))
-                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
+                .layer(ProxyLayer::new(
+                    self.l2_targets.build(FanoutKind::L2)?,
+                    metrics.clone(),
+                ));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)
@@ -374,10 +377,13 @@ impl Cli {
             let middleware = tower::ServiceBuilder::new()
                 .layer(HealthLayer)
                 .layer(ValidationLayer::new(
-                    self.builder_targets.build()?,
+                    self.builder_targets.build(FanoutKind::Builder)?,
                     metrics.clone(),
                 ))
-                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
+                .layer(ProxyLayer::new(
+                    self.l2_targets.build(FanoutKind::L2)?,
+                    metrics.clone(),
+                ));
 
             let server = Server::builder()
                 .set_http_middleware(middleware)
@@ -444,7 +450,7 @@ pub(crate) async fn init_metrics_server(
 }
 
 macro_rules! define_rpc_args {
-    ($(($name:ident, $prefix:ident, $kind:expr)),* $(,)?) => {
+    ($(($name:ident, $prefix:ident)),*) => {
         $(
             paste! {
                 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
@@ -479,7 +485,7 @@ macro_rules! define_rpc_args {
                         }
                     }
 
-                    pub fn build(&self) -> Result<FanoutWrite> {
+                    pub fn build(&self, kind: FanoutKind) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
                         let backend = self.[<$prefix _urls>]
                             .iter()
@@ -488,7 +494,7 @@ macro_rules! define_rpc_args {
                             })
                             .collect::<Vec<_>>();
 
-                        Ok(FanoutWrite::new(backend, $kind))
+                        Ok(FanoutWrite::new(backend, kind))
                     }
                 }
             }
@@ -496,7 +502,4 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!(
-    (BuilderTargets, builder, FanoutKind::Builder),
-    (L2Targets, l2, FanoutKind::L2),
-);
+define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
