@@ -444,33 +444,33 @@ pub(crate) async fn init_metrics_server(
 }
 
 macro_rules! define_rpc_args {
-    ($($kind:ident),*) => {
+    ($(($name:ident, $prefix:ident, $kind:expr)),* $(,)?) => {
         $(
             paste! {
                 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
-                pub struct [<$kind Targets>] {
+                pub struct $name {
                     /// RPC URLs
                     #[arg(long, env)]
-                    pub [<$kind:snake _urls>]: Vec<Uri>,
+                    pub [<$prefix _urls>]: Vec<Uri>,
 
                     /// Hex encoded JWT secret to use for an authenticated RPC server.
                     #[arg(long, env, value_name = "HEX")]
-                    pub [<$kind:snake _jwt_token>]: Option<JwtSecret>,
+                    pub [<$prefix _jwt_token>]: Option<JwtSecret>,
 
                     /// Path to a JWT secret to use for an authenticated RPC server.
                     #[arg(long, env, value_name = "PATH")]
-                    pub [<$kind:snake _jwt_path>]: Option<PathBuf>,
+                    pub [<$prefix _jwt_path>]: Option<PathBuf>,
 
                     /// Timeout for http calls in milliseconds
                     #[arg(long, env, default_value_t = 1000)]
-                    pub [<$kind:snake _timeout>]: u64,
+                    pub [<$prefix _timeout>]: u64,
                 }
 
-                impl [<$kind Targets>] {
+                impl $name {
                     fn get_jwt(&self) -> Result<JwtSecret> {
-                        if let Some(secret) = &self.[<$kind:snake _jwt_token>] {
+                        if let Some(secret) = &self.[<$prefix _jwt_token>] {
                             Ok(secret.clone())
-                        } else if let Some(path) = &self.[<$kind:snake _jwt_path>] {
+                        } else if let Some(path) = &self.[<$prefix _jwt_path>] {
                             Ok(JwtSecret::from_file(path)?)
                         } else {
                             Err(eyre!(
@@ -481,14 +481,14 @@ macro_rules! define_rpc_args {
 
                     pub fn build(&self) -> Result<FanoutWrite> {
                         let jwt = self.get_jwt()?;
-                        let backend = self.[<$kind:snake _urls>]
+                        let backend = self.[<$prefix _urls>]
                             .iter()
                             .map(|url| {
-                                HttpClient::new(url.clone(), jwt, self.[<$kind:snake _timeout>])
+                                HttpClient::new(url.clone(), jwt, self.[<$prefix _timeout>])
                             })
                             .collect::<Vec<_>>();
 
-                        Ok(FanoutWrite::new(backend, FanoutKind::$kind))
+                        Ok(FanoutWrite::new(backend, $kind))
                     }
                 }
             }
@@ -496,4 +496,7 @@ macro_rules! define_rpc_args {
     };
 }
 
-define_rpc_args!(Builder, L2);
+define_rpc_args!(
+    (BuilderTargets, builder, FanoutKind::Builder),
+    (L2Targets, l2, FanoutKind::L2),
+);
