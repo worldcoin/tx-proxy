@@ -120,12 +120,13 @@ mod tests {
 
         let metrics = snapshotter.snapshot().into_vec();
         assert!(metrics.iter().any(|(key, _, _, value)| {
-            key.key().name() == "fanout_total_failures"
-                && key
-                    .key()
-                    .labels()
-                    .any(|label| label.key() == "fanout" && label.value() == "l2")
-                && *value == DebugValue::Counter(1)
+            let key = key.key();
+            let key_name = key.name();
+            let is_l2_fanout = key
+                .labels()
+                .any(|label| label.key() == "fanout" && label.value() == "l2");
+
+            key_name == "fanout_total_failures" && is_l2_fanout && *value == DebugValue::Counter(1)
         }));
     }
 
@@ -141,14 +142,18 @@ mod tests {
 
         let metrics = snapshotter.snapshot().into_vec();
         assert!(metrics.iter().any(|(key, _, _, value)| {
-            key.key().name() == "fanout_target_healthy"
-                && key
-                    .key()
-                    .labels()
-                    .any(|label| label.key() == "fanout" && label.value() == "builder")
-                && key.key().labels().any(|label| {
-                    label.key() == "target" && label.value() == "builder.internal:8545"
-                })
+            let key = key.key();
+            let key_name = key.name();
+            let is_builder_fanout = key
+                .labels()
+                .any(|label| label.key() == "fanout" && label.value() == "builder");
+            let is_correct_target = key
+                .labels()
+                .any(|label| label.key() == "target" && label.value() == "builder.internal:8545");
+
+            key_name == "fanout_target_healthy"
+                && is_builder_fanout
+                && is_correct_target
                 && *value == DebugValue::Gauge(0.0.into())
         }));
     }
