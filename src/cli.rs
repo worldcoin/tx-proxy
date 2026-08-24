@@ -58,10 +58,6 @@ pub struct Cli {
     #[clap(flatten)]
     pub l2_targets: L2Targets,
 
-    /// Fan requests directly to L2 targets without an external builder validation pass.
-    #[arg(long, env, default_value_t = false)]
-    pub relay_only: bool,
-
     /// JWT Secret for the RPC server
     #[clap(long, env, value_name = "HEX")]
     pub jwt_token: Option<JwtSecret>,
@@ -351,34 +347,18 @@ impl Cli {
         metrics: Arc<ProxyMetrics>,
     ) -> Result<ServerHandle> {
         let module = RpcModule::new(());
-        let l2_fanout = self.l2_targets.build()?;
         if let Some(secret) = jwt_secret {
-            if self.relay_only {
-                let server = Server::builder()
-                    .set_http_middleware(
-                        tower::ServiceBuilder::new()
-                            .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
-                            .layer(HealthLayer)
-                            .layer(ProxyLayer::new(l2_fanout, metrics.clone())),
-                    )
-                    .max_connections(self.max_concurrent_connections)
-                    .build(SocketAddr::new(self.http_addr, self.http_port))
-                    .await?;
-                info!(target: "tx-proxy::cli", addr = %server.local_addr()?, "Building authenticated relay-only RPC server");
-                return Ok(server.start(module));
-            }
+            let middleware = tower::ServiceBuilder::new()
+                .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
+                .layer(HealthLayer)
+                .layer(ValidationLayer::new(
+                    self.builder_targets.build()?,
+                    metrics.clone(),
+                ))
+                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
-                .set_http_middleware(
-                    tower::ServiceBuilder::new()
-                        .layer(AuthLayer::new(JwtAuthValidator::new(secret)))
-                        .layer(HealthLayer)
-                        .layer(ValidationLayer::new(
-                            self.builder_targets.build()?,
-                            metrics.clone(),
-                        ))
-                        .layer(ProxyLayer::new(l2_fanout, metrics.clone())),
-                )
+                .set_http_middleware(middleware)
                 .max_connections(self.max_concurrent_connections)
                 .build(SocketAddr::new(self.http_addr, self.http_port))
                 .await?;
@@ -387,30 +367,16 @@ impl Cli {
 
             Ok(server.start(module))
         } else {
-            if self.relay_only {
-                let server = Server::builder()
-                    .set_http_middleware(
-                        tower::ServiceBuilder::new()
-                            .layer(HealthLayer)
-                            .layer(ProxyLayer::new(l2_fanout, metrics.clone())),
-                    )
-                    .max_connections(self.max_concurrent_connections)
-                    .build(format!("{}:{}", self.http_addr, self.http_port))
-                    .await?;
-                info!(target: "tx-proxy::cli", addr = %server.local_addr()?, "Building unauthenticated relay-only RPC server");
-                return Ok(server.start(module));
-            }
+            let middleware = tower::ServiceBuilder::new()
+                .layer(HealthLayer)
+                .layer(ValidationLayer::new(
+                    self.builder_targets.build()?,
+                    metrics.clone(),
+                ))
+                .layer(ProxyLayer::new(self.l2_targets.build()?, metrics.clone()));
 
             let server = Server::builder()
-                .set_http_middleware(
-                    tower::ServiceBuilder::new()
-                        .layer(HealthLayer)
-                        .layer(ValidationLayer::new(
-                            self.builder_targets.build()?,
-                            metrics.clone(),
-                        ))
-                        .layer(ProxyLayer::new(l2_fanout, metrics.clone())),
-                )
+                .set_http_middleware(middleware)
                 .max_connections(self.max_concurrent_connections)
                 .build(format!("{}:{}", self.http_addr, self.http_port))
                 .await?;
