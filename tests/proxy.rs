@@ -20,7 +20,7 @@ use std::{
 };
 use tokio::{net::TcpListener, task::JoinHandle};
 use tx_proxy::client::HttpClient as TxProxyHttpClient;
-use tx_proxy::fanout::FanoutWrite;
+use tx_proxy::fanout::{FanoutKind, FanoutWrite};
 use tx_proxy::proxy::ProxyLayer;
 use tx_proxy::validation::ValidationLayer;
 
@@ -85,14 +85,19 @@ impl TestHarness {
             1000,
         );
 
-        let builder_fanout = FanoutWrite::new(vec![
-            builder_0_http_client,
-            builder_1_http_client,
-            builder_2_http_client,
-        ]);
+        let builder_fanout = FanoutWrite::new(
+            vec![
+                builder_0_http_client,
+                builder_1_http_client,
+                builder_2_http_client,
+            ],
+            FanoutKind::Builder,
+        );
 
-        let l2_fanout =
-            FanoutWrite::new(vec![l2_0_http_client, l2_1_http_client, l2_2_http_client]);
+        let l2_fanout = FanoutWrite::new(
+            vec![l2_0_http_client, l2_1_http_client, l2_2_http_client],
+            FanoutKind::L2,
+        );
 
         let middleware = tower::ServiceBuilder::new()
             .layer(HealthLayer)

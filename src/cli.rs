@@ -2,7 +2,11 @@ use crate::any_or_value::AnyOr;
 use crate::auth::{AuthLayer, JwtAuthValidator};
 use crate::metrics::ProxyMetrics;
 use crate::proxy::ProxyLayer;
-use crate::{client::HttpClient, fanout::FanoutWrite, validation::ValidationLayer};
+use crate::{
+    client::HttpClient,
+    fanout::{FanoutKind, FanoutWrite},
+    validation::ValidationLayer,
+};
 use alloy_rpc_types_engine::JwtSecret;
 use clap::Parser;
 use eyre::Context as _;
@@ -192,7 +196,8 @@ impl Cli {
             });
         }
 
-        Ok(Arc::new(ProxyMetrics::new()))
+        ProxyMetrics::describe_fanout_metrics();
+        Ok(Arc::new(ProxyMetrics::default()))
     }
 
     fn init_tracing(&self) -> Result<()> {
@@ -478,56 +483,55 @@ pub(crate) async fn init_metrics_server(
 }
 
 macro_rules! define_rpc_args {
-    ($(($name:ident, $prefix:ident)),*) => {
-        $(
-            paste! {
-                #[derive(Parser, Debug, Clone, PartialEq, Eq)]
-                pub struct $name {
-                    /// RPC URLs
-                    #[arg(long, env)]
-                    pub [<$prefix _urls>]: Vec<Uri>,
+    ($name:ident, $prefix:ident, $kind:expr) => {
+        paste! {
+            #[derive(Parser, Debug, Clone, PartialEq, Eq)]
+            pub struct $name {
+                /// RPC URLs
+                #[arg(long, env)]
+                pub [<$prefix _urls>]: Vec<Uri>,
 
-                    /// Hex encoded JWT secret to use for an authenticated RPC server.
-                    #[arg(long, env, value_name = "HEX")]
-                    pub [<$prefix _jwt_token>]: Option<JwtSecret>,
+                /// Hex encoded JWT secret to use for an authenticated RPC server.
+                #[arg(long, env, value_name = "HEX")]
+                pub [<$prefix _jwt_token>]: Option<JwtSecret>,
 
-                    /// Path to a JWT secret to use for an authenticated RPC server.
-                    #[arg(long, env, value_name = "PATH")]
-                    pub [<$prefix _jwt_path>]: Option<PathBuf>,
+                /// Path to a JWT secret to use for an authenticated RPC server.
+                #[arg(long, env, value_name = "PATH")]
+                pub [<$prefix _jwt_path>]: Option<PathBuf>,
 
-                    /// Timeout for http calls in milliseconds
-                    #[arg(long, env, default_value_t = 1000)]
-                    pub [<$prefix _timeout>]: u64,
+                /// Timeout for http calls in milliseconds
+                #[arg(long, env, default_value_t = 1000)]
+                pub [<$prefix _timeout>]: u64,
+            }
+
+            impl $name {
+                fn get_jwt(&self) -> Result<JwtSecret> {
+                    if let Some(secret) = &self.[<$prefix _jwt_token>] {
+                        Ok(secret.clone())
+                    } else if let Some(path) = &self.[<$prefix _jwt_path>] {
+                        Ok(JwtSecret::from_file(path)?)
+                    } else {
+                        Err(eyre!(
+                            "No JWT secret provided. Please provide either a hex encoded JWT secret or a path to a file containing the JWT secret."
+                        ))
+                    }
                 }
 
-                impl $name {
-                    fn get_jwt(&self) -> Result<JwtSecret> {
-                        if let Some(secret) = &self.[<$prefix _jwt_token>] {
-                            Ok(secret.clone())
-                        } else if let Some(path) = &self.[<$prefix _jwt_path>] {
-                            Ok(JwtSecret::from_file(path)?)
-                        } else {
-                            Err(eyre!(
-                                "No JWT secret provided. Please provide either a hex encoded JWT secret or a path to a file containing the JWT secret."
-                            ))
-                        }
-                    }
+                pub fn build(&self) -> Result<FanoutWrite> {
+                    let jwt = self.get_jwt()?;
+                    let backend = self.[<$prefix _urls>]
+                        .iter()
+                        .map(|url| {
+                            HttpClient::new(url.clone(), jwt, self.[<$prefix _timeout>])
+                        })
+                        .collect::<Vec<_>>();
 
-                    pub fn build(&self) -> Result<FanoutWrite> {
-                        let jwt = self.get_jwt()?;
-                        let backend = self.[<$prefix _urls>]
-                            .iter()
-                            .map(|url| {
-                                HttpClient::new(url.clone(), jwt, self.[<$prefix _timeout>])
-                            })
-                            .collect::<Vec<_>>();
-
-                        Ok(FanoutWrite::new(backend))
-                    }
+                    Ok(FanoutWrite::new(backend, $kind))
                 }
             }
-        )*
+        }
     };
 }
 
-define_rpc_args!((BuilderTargets, builder), (L2Targets, l2));
+define_rpc_args!(BuilderTargets, builder, FanoutKind::Builder);
+define_rpc_args!(L2Targets, l2, FanoutKind::L2);
