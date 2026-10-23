@@ -46,7 +46,7 @@ jobs:
           toolchain: ${{ env.NIGHTLY_VERSION }}
           override: true
       - name: Install protobuf-compiler
-        run: sudo apt-get install -y protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Cache
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f
         continue-on-error: false

@@ -55,6 +55,6 @@ mod tests {
     fn coalesce(items: &[&str]) -> AnyOr<Vec<i32>> {
         let items: Vec<AnyOr<i32>> = items.iter().map(|s| s.parse().unwrap()).collect();
 
-        AnyOr::coalesce(items)
+        AnyOr::coalesce(&items)
     }
 }
