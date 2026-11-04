@@ -67,7 +67,7 @@ impl HttpClient {
         fields(otel.kind = ?SpanKind::Client)
     )]
     pub async fn forward(&mut self, req: RpcRequest) -> Result<RpcResponse<HttpBody>, BoxError> {
-        debug!("forwarding {}", req.method);
+        debug!(target: "tx-proxy::http::forward", "forwarding {}", req.method);
         let mut req: http::Request<HttpBody> = req.into();
         *req.uri_mut() = self.url.clone();
 
