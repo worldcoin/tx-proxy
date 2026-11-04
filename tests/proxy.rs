@@ -16,9 +16,17 @@ use rollup_boost::HealthLayer;
 use serde_json::json;
 use std::{
     net::SocketAddr,
+    process::Stdio,
     sync::{Arc, Mutex},
+    time::Duration,
 };
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    net::TcpListener,
+    process::Command,
+    task::JoinHandle,
+    time::timeout,
+};
 use tx_proxy::client::HttpClient as TxProxyHttpClient;
 use tx_proxy::fanout::FanoutWrite;
 use tx_proxy::proxy::ProxyLayer;
@@ -250,6 +258,90 @@ fn crypto_ring_init() {
     rustls::crypto::ring::default_provider()
         .install_default()
         .unwrap();
+}
+
+#[tokio::test]
+async fn test_forwarding_logs_respect_cli_log_level() -> Result<()> {
+    let backend = MockHttpServer::serve().await?;
+    let backend_url = format!("http://127.0.0.1:{}", backend.addr.port());
+    let jwt = "11".repeat(32);
+
+    for level in ["info", "debug"] {
+        let mut proxy = Command::new(env!("CARGO_BIN_EXE_tx-proxy"))
+            .args([
+                "--http-addr=127.0.0.1",
+                "--http-port=0",
+                "--log-format=json",
+                "--log-level",
+                level,
+                "--builder-urls",
+                &backend_url,
+                "--l2-urls",
+                &backend_url,
+                "--builder-jwt-token",
+                &jwt,
+                "--l2-jwt-token",
+                &jwt,
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true)
+            .spawn()?;
+        let mut logs = BufReader::new(proxy.stdout.take().unwrap()).lines();
+
+        let addr = timeout(Duration::from_secs(10), async {
+            while let Some(line) = logs.next_line().await? {
+                let event: serde_json::Value = serde_json::from_str(&line)?;
+                if event["fields"]["message"] == "Building Unauthenticated RPC server" {
+                    return event["fields"]["addr"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .ok_or_else(|| eyre::eyre!("RPC startup log is missing its address"));
+                }
+            }
+            Err(eyre::eyre!("Proxy exited before its RPC startup log"))
+        })
+        .await??;
+
+        let client = HttpClient::builder().build(format!("http://{addr}"))?;
+        timeout(
+            Duration::from_secs(5),
+            client.request::<serde_json::Value, _>("eth_sendRawTransaction", (bytes!("1234"),)),
+        )
+        .await??;
+        timeout(Duration::from_secs(5), proxy.kill()).await??;
+
+        let events = timeout(Duration::from_secs(5), async {
+            let mut events = Vec::new();
+            while let Some(line) = logs.next_line().await? {
+                events.push(serde_json::from_str::<serde_json::Value>(&line)?);
+            }
+            Ok::<_, eyre::Report>(events)
+        })
+        .await??;
+
+        if level == "debug" {
+            for message in [
+                "forwarding request to builder fanout",
+                "forwarding eth_sendRawTransaction",
+                "forwarding request to l2 fanout",
+            ] {
+                assert!(
+                    events.iter().any(|event| {
+                        event["level"] == "DEBUG" && event["fields"]["message"] == message
+                    }),
+                    "missing DEBUG event: {message}; captured: {events:?}"
+                );
+            }
+        } else {
+            assert!(
+                events.iter().all(|event| event["level"] != "DEBUG"),
+                "INFO logging emitted DEBUG events: {events:?}"
+            );
+        }
+    }
+
+    Ok(())
 }
 
 #[tokio::test]
